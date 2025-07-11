@@ -29,10 +29,6 @@
 #include <fnmatch.h>
 #include <cmath>
 
-// Global debug flag and macro (must be before any function that uses them)
-static bool debug = false;
-#define DEBUG_PRINT(...) do { if (debug) printf(__VA_ARGS__); } while(0)
-
 // Version macro: build date and time (format: "Jul 11 2025 03:23:25")
 const char* BUILD_VERSION = __DATE__ " " __TIME__;
 
@@ -206,12 +202,6 @@ double get_time_ms() {
     return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
 }
 
-void print_mem_usage(const std::string& label) {
-    struct rusage usage;
-    getrusage(RUSAGE_SELF, &usage);
-    DEBUG_PRINT("[MEM] %s: Max RSS: %ld KB\n", label.c_str(), usage.ru_maxrss);
-}
-
 void pin_to_core(int core_id) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
@@ -256,7 +246,6 @@ void yield_cpu() {
 
 void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yield, bool mask_sensitive, bool output_json, TestResults* json_results) {
     double t0 = get_time_ms();
-    if (!minimize_output && !output_json) print_mem_usage("Start");
     if (warmup) {
         for (int i = 0; i < 3; ++i) {
             http_get("speed.cloudflare.com", "/__down?bytes=1000");
@@ -266,7 +255,6 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
     // Fetch server location data
     double t_loc = get_time_ms();
     std::string loc_json = http_get("speed.cloudflare.com", "/locations");
-    if (!minimize_output && !output_json) print_mem_usage("After locations");
     if (!minimize_output && !output_json) printf("[TIME] Fetch locations: %.2f ms\n", get_time_ms() - t_loc);
     auto locations = parse_locations_json(loc_json);
     std::map<std::string, std::string> serverLocationData;
@@ -276,13 +264,11 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
     // Fetch CDN trace
     double t_trace = get_time_ms();
     std::string trace = http_get("speed.cloudflare.com", "/cdn-cgi/trace");
-    if (!minimize_output && !output_json) print_mem_usage("After trace");
     if (!minimize_output && !output_json) printf("[TIME] Fetch trace: %.2f ms\n", get_time_ms() - t_trace);
     auto cfTrace = parse_cdn_trace(trace);
     // Measure latency
     double t_ping = get_time_ms();
     auto ping = measure_latency();
-    if (!minimize_output && !output_json) print_mem_usage("After latency");
     if (!minimize_output && !output_json) printf("[TIME] Latency: %.2f ms\n", get_time_ms() - t_ping);
     std::string city = serverLocationData.count(cfTrace["colo"]) ? serverLocationData[cfTrace["colo"]] : cfTrace["colo"];
     log_info("Server location", city + " (" + cfTrace["colo"] + ")", output_json);
@@ -313,7 +299,6 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
     if (do_yield) yield_cpu();
     log_speed_test_result("100MB", testDown5, output_json);
     if (!minimize_output && !output_json) printf("[TIME] Download tests: %.2f ms\n", get_time_ms() - t_down);
-    if (!minimize_output && !output_json) print_mem_usage("After downloads");
     std::vector<double> downloadTests;
     downloadTests.insert(downloadTests.end(), testDown1.begin(), testDown1.end());
     downloadTests.insert(downloadTests.end(), testDown2.begin(), testDown2.end());
@@ -329,14 +314,12 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
     auto testUp3 = measure_upload(1001000, 8);
     if (do_yield) yield_cpu();
     if (!minimize_output && !output_json) printf("[TIME] Upload tests: %.2f ms\n", get_time_ms() - t_up);
-    if (!minimize_output && !output_json) print_mem_usage("After uploads");
     std::vector<double> uploadTests;
     uploadTests.insert(uploadTests.end(), testUp1.begin(), testUp1.end());
     uploadTests.insert(uploadTests.end(), testUp2.begin(), testUp2.end());
     uploadTests.insert(uploadTests.end(), testUp3.begin(), testUp3.end());
     log_upload_speed(uploadTests, output_json);
     if (!minimize_output && !output_json) printf("[TIME] Total: %.2f ms\n", get_time_ms() - t0);
-    if (!minimize_output && !output_json) print_mem_usage("End");
     // If JSON output requested, fill TestResults struct
     if (output_json && json_results) {
         json_results->city = city;
@@ -591,7 +574,6 @@ std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& 
 }
 
 void print_summary_table(const std::vector<SummaryResult>& results) {
-    DEBUG_PRINT("[DEBUG] Entered print_summary_table, results.size() = %zu\n", results.size()); fflush(stdout);
     // Define column widths to match header text exactly
     const int w_file = 28;         // For long filenames
     const int w_server = 15;       // For city names
@@ -628,9 +610,6 @@ void print_summary_table(const std::vector<SummaryResult>& results) {
     // Print rows
     for (size_t i = 0; i < results.size(); ++i) {
         const auto& r = results[i];
-        DEBUG_PRINT("[DEBUG] Row %zu: file=%s, server_city=%s, ip=%s, latency=%f, jitter=%f, download=%f, upload=%f\n",
-            i, r.file.c_str(), r.server_city.c_str(), r.ip.c_str(), r.latency, r.jitter, r.download, r.upload);
-        fflush(stdout);
         printf("%-*s %-*s %-*s %*.2f %*.2f %*.2f %*.2f\n",
             w_file, r.file.c_str(),
             w_server, r.server_city.c_str(),
@@ -642,7 +621,6 @@ void print_summary_table(const std::vector<SummaryResult>& results) {
     }
     // Print average row
     if (!results.empty()) {
-        DEBUG_PRINT("[DEBUG] Calculating averages...\n"); fflush(stdout);
         double sum_latency = 0, sum_jitter = 0, sum_download = 0, sum_upload = 0;
         std::string avg_server = results[0].server_city;
         std::string avg_ip = results[0].ip;
@@ -791,13 +769,11 @@ int main(int argc, char* argv[]) {
     bool do_yield = true;
     bool do_nice = true;
     bool do_drop_caches = false;
-    bool show_flags_used = false;
     bool output_json = false;
     bool mask_sensitive = false;
     bool show_sysinfo = false;
     bool show_sysinfo_only = false;
     bool summary_table = false;
-    bool debug_flag = false;
     std::vector<std::string> used_flags;
     std::vector<std::string> summary_files;
     for (int i = 1; i < argc; ++i) {
@@ -810,7 +786,6 @@ int main(int argc, char* argv[]) {
         if (arg == "--no-yield") { do_yield = false; used_flags.push_back(arg); recognized = true; }
         if (arg == "--no-nice") { do_nice = false; used_flags.push_back(arg); recognized = true; }
         if (arg == "--drop-caches") { do_drop_caches = true; used_flags.push_back(arg); recognized = true; }
-        if (arg == "--show-flags-used") { show_flags_used = true; recognized = true; }
         if (arg == "--mask-sensitive") { mask_sensitive = true; used_flags.push_back(arg); recognized = true; }
         if (arg == "--show-sysinfo") { show_sysinfo = true; used_flags.push_back(arg); recognized = true; }
         if (arg == "--show-sysinfo-only") { show_sysinfo_only = true; recognized = true; }
@@ -826,27 +801,19 @@ int main(int argc, char* argv[]) {
             summary_files = expand_wildcards(patterns);
             break;
         }
-        if (arg == "--debug") { debug_flag = true; recognized = true; }
         if (arg == "--help" || arg == "-h") { print_help(); return 0; }
         if (!recognized) {
             std::cerr << "[WARN] Unknown flag: " << arg << std::endl;
         }
     }
-    debug = debug_flag;
     if (summary_table) {
-        DEBUG_PRINT("[DEBUG] summary_table branch\n"); fflush(stdout);
         if (summary_files.empty()) {
             std::cerr << "[ERROR] --summary-table requires at least one JSON file as argument." << std::endl;
             return 1;
         }
-        DEBUG_PRINT("[DEBUG] Calling load_summary_results\n"); fflush(stdout);
         auto results = load_summary_results(summary_files);
-        DEBUG_PRINT("[DEBUG] Calling print_summary_table\n"); fflush(stdout);
         print_summary_table(results);
-        DEBUG_PRINT("[DEBUG] Returned from print_summary_table\n"); fflush(stdout);
-        DEBUG_PRINT("[DEBUG] About to call write_summary_json\n"); fflush(stdout);
         write_summary_json(results, "results/summary.json");
-        DEBUG_PRINT("[DEBUG] Returned from write_summary_json\n"); fflush(stdout);
         return 0;
     }
     if (show_sysinfo_only) {
@@ -863,14 +830,6 @@ int main(int argc, char* argv[]) {
         std::cout << serialize_to_json(results) << std::endl;
     } else {
         speed_test(use_parallel, minimize_output, warmup, do_yield, mask_sensitive, output_json);
-    }
-    if (show_flags_used && !used_flags.empty()) {
-        std::cout << "[FLAGS USED] ";
-        for (size_t i = 0; i < used_flags.size(); ++i) {
-            std::cout << used_flags[i];
-            if (i + 1 < used_flags.size()) std::cout << " ";
-        }
-        std::cout << std::endl;
     }
     return 0;
 }
