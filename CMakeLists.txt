@@ -23,7 +23,18 @@ endif()
 
 add_definitions(-DYYJSON_WRITE_MAX_DEPTH=32)
 
-add_executable(SpeedCloudflareCli main.cpp chalk.cpp stats.cpp)
+add_executable(SpeedCloudflareCli
+    main.cpp
+    chalk.cpp
+    stats.cpp
+    benchmarks.cpp
+    cli_args.cpp
+    output.cpp
+    json_helpers.cpp
+    diagnostics.cpp
+    sysinfo.cpp
+    network.cpp
+)
 
 target_link_libraries(SpeedCloudflareCli PRIVATE pthread ${CURL_LIBRARIES} yyjson)
 
