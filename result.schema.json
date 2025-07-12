@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SpeedCloudflareCli Individual Result",
+  "type": "object",
+  "properties": {
+    "sysinfo_date": { "type": "string" },
+    "server_city": { "type": "string" },
+    "colo": { "type": "string" },
+    "ip": { "type": "string" },
+    "loc": { "type": "string" },
+    "host": { "type": "string" },
+    "arch": { "type": "string" },
+    "kernel": { "type": "string" },
+    "cpu_model": { "type": "string" },
+    "mem_total": { "type": "string" },
+    "version": { "type": "string" },
+    "cpu_cores": { "type": "integer" },
+    "latency": { "type": "array", "items": { "type": "number" } },
+    "download_100kB": { "type": "array", "items": { "type": "number" } },
+    "download_1MB": { "type": "array", "items": { "type": "number" } },
+    "download_10MB": { "type": "array", "items": { "type": "number" } },
+    "download_25MB": { "type": "array", "items": { "type": "number" } },
+    "download_100MB": { "type": "array", "items": { "type": "number" } },
+    "all_downloads": { "type": "array", "items": { "type": "number" } },
+    "upload_11kB": { "type": "array", "items": { "type": "number" } },
+    "upload_100kB": { "type": "array", "items": { "type": "number" } },
+    "upload_1MB": { "type": "array", "items": { "type": "number" } },
+    "all_uploads": { "type": "array", "items": { "type": "number" } },
+    "total_time_ms": { "type": "number" },
+    "latency_avg": { "type": "number" },
+    "jitter": { "type": "number" },
+    "download_90pct": { "type": "number" },
+    "upload_90pct": { "type": "number" },
+    "flags": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": [
+    "sysinfo_date", "server_city", "colo", "ip", "loc", "host", "arch", "kernel", "cpu_model", "mem_total", "version", "cpu_cores",
+    "latency", "download_100kB", "download_1MB", "download_10MB", "download_25MB", "download_100MB", "all_downloads",
+    "upload_11kB", "upload_100kB", "upload_1MB", "all_uploads", "total_time_ms", "latency_avg", "jitter", "download_90pct", "upload_90pct", "flags"
+  ],
+  "additionalProperties": false
+}

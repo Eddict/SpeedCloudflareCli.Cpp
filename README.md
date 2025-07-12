@@ -34,8 +34,10 @@ A minimal, flexible, and low-overhead command-line tool for benchmarking Cloudfl
 | `--show-flags-used`     |       | Print a line at the end with all explicitly set flags (default: off)        |
 | `--show-sysinfo`        |       | Show basic host architecture, CPU, and memory info (default: off)           |
 | `--show-sysinfo-only`   |       | Only print system info and exit (supports --mask-sensitive)                  |
-| `--debug`               |       | Show debug output (default: off)                                            |
-| `--help`                | `-h`  | Show help message and exit                                                  |
+| `--json`                 |       | Output results as JSON to stdout (default: off)                           |
+| `--summary-table FILES`  |       | Print a summary table comparing multiple JSON result files                |
+| `--debug`               |       | Show debug output (default: off)                                         |
+| `--help`                | `-h`  | Show help message and exit                                               |
 
 ### Default Behavior
 - Runs sequential download/upload tests
@@ -74,3 +76,8 @@ CC=arm-linux-gnueabihf-gcc cmake . && make -j
 
 ## License
 See `COPYING`.
+
+### For the latest options, run:
+```
+./SpeedCloudflareCli --help
+```
