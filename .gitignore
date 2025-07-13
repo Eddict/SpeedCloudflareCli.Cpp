@@ -21,9 +21,9 @@ CMakeUserPresets.json
 /.vs
 /out
 /results
-/run_benchmarks.sh
 /build*
 /SpeedCloudflareCli
+.keep
 
 # Ignore local yyjson sources to ensure only official sources are used
 yyjson/
