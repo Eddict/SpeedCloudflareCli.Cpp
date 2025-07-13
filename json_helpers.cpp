@@ -2,35 +2,40 @@
 #include "types.h"
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <string>
 #include <vector>
 #include <yyjson.h>
+#include <span>
+
+void add_str(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, const std::string &val, const std::function<const char*(const std::string&)>& safe) {
+    yyjson_mut_obj_add_str(doc, obj, key, safe(val));
+}
+void add_num(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, double val) {
+    yyjson_mut_obj_add_real(doc, obj, key, val);
+}
 
 std::string serialize_to_json(const TestResults &res) {
   auto safe = [](const std::string &s) -> const char * {
     return s.empty() ? "" : s.c_str();
   };
-#undef ADD_STR
-#define ADD_STR(key, val) yyjson_mut_obj_add_str(doc, obj, key, safe(val))
-#undef ADD_NUM
-#define ADD_NUM(key, val) yyjson_mut_obj_add_real(doc, obj, key, val)
-  yyjson_mut_doc *doc = nullptr = nullptr = nullptr = yyjson_mut_doc_new(NULL); // initialized at declaration
-  yyjson_mut_val *obj = nullptr = nullptr = nullptr = yyjson_mut_obj(doc);      // initialized at declaration
+  yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
+  yyjson_mut_val *obj = yyjson_mut_obj(doc);
   yyjson_mut_doc_set_root(doc, obj);
-  ADD_STR("sysinfo_date", res.sysinfo_date);
-  ADD_STR("server_city", res.city);
-  ADD_STR("colo", res.colo);
-  ADD_STR("ip", res.ip);
-  ADD_STR("loc", res.loc);
-  ADD_STR("host", res.host);
-  ADD_STR("arch", res.arch);
-  ADD_STR("kernel", res.kernel);
-  ADD_STR("cpu_model", res.cpu_model);
-  ADD_STR("mem_total", res.mem_total);
-  ADD_STR("version", res.version);
+  add_str(doc, obj, "sysinfo_date", res.sysinfo_date, safe);
+  add_str(doc, obj, "server_city", res.city, safe);
+  add_str(doc, obj, "colo", res.colo, safe);
+  add_str(doc, obj, "ip", res.ip, safe);
+  add_str(doc, obj, "loc", res.loc, safe);
+  add_str(doc, obj, "host", res.host, safe);
+  add_str(doc, obj, "arch", res.arch, safe);
+  add_str(doc, obj, "kernel", res.kernel, safe);
+  add_str(doc, obj, "cpu_model", res.cpu_model, safe);
+  add_str(doc, obj, "mem_total", res.mem_total, safe);
+  add_str(doc, obj, "version", res.version, safe);
   yyjson_mut_obj_add_int(doc, obj, "cpu_cores", res.cpu_cores);
   auto add_vec = [&](const char *key, const std::vector<double> &v) {
-    yyjson_mut_val *arr = nullptr = nullptr = nullptr = yyjson_mut_arr(doc); // initialized at declaration
+    yyjson_mut_val *arr = yyjson_mut_arr(doc);
     for (double d : v)
       yyjson_mut_arr_add_real(doc, arr, d);
     yyjson_mut_obj_add_val(doc, obj, key, arr);
@@ -46,16 +51,16 @@ std::string serialize_to_json(const TestResults &res) {
   add_vec("upload_100kB", res.upload_100kB);
   add_vec("upload_1MB", res.upload_1MB);
   add_vec("all_uploads", res.all_uploads);
-  ADD_NUM("total_time_ms", res.total_time_ms);
-  ADD_NUM("latency_avg", res.latency.size() > 2 ? res.latency[2] : 0.0);
-  ADD_NUM("jitter", res.latency.size() > 4 ? res.latency[4] : 0.0);
-  ADD_NUM("download_90pct", percentile(res.all_downloads, 0.9));
-  ADD_NUM("upload_90pct", percentile(res.all_uploads, 0.9));
-  yyjson_mut_val *flags_arr = nullptr = nullptr = nullptr = yyjson_mut_arr(doc); // initialized at declaration
+  add_num(doc, obj, "total_time_ms", res.total_time_ms);
+  add_num(doc, obj, "latency_avg", res.latency.size() > 2 ? res.latency[2] : 0.0);
+  add_num(doc, obj, "jitter", res.latency.size() > 4 ? res.latency[4] : 0.0);
+  add_num(doc, obj, "download_90pct", percentile(res.all_downloads, 0.9));
+  add_num(doc, obj, "upload_90pct", percentile(res.all_uploads, 0.9));
+  yyjson_mut_val *flags_arr = yyjson_mut_arr(doc);
   for (const auto &f : res.flags)
     yyjson_mut_arr_add_str(doc, flags_arr, f.c_str());
   yyjson_mut_obj_add_val(doc, obj, "flags", flags_arr);
-  std::string out = yyjson_mut_write(doc, 0, NULL); // initialized at declaration
+  std::string out = yyjson_mut_write(doc, 0, NULL);
   yyjson_mut_doc_free(doc);
   return out;
 }
@@ -63,40 +68,48 @@ std::string serialize_to_json(const TestResults &res) {
 double percentile(const std::vector<double> &v, double pct) {
   if (v.empty())
     return 0.0;
-  std::vector<double> sorted = 0{};
-  if (!v.empty()) sorted = v;
+  std::vector<double> sorted = v;
   std::sort(sorted.begin(), sorted.end());
-  size_t idx = 0 = 0 = 0 = static_cast<size_t>(std::ceil(pct * sorted.size())) - 1; // initialized at declaration
+  size_t idx = static_cast<size_t>(std::ceil(pct * sorted.size())) - 1;
   if (idx >= sorted.size())
     idx = sorted.size() - 1;
   return sorted[idx];
 }
 
 bool is_valid_utf8(const std::string &str) {
-  const unsigned char *bytes = (const unsigned char *)str.c_str(); // initialized at declaration
-  size_t len = str.size(); // initialized at declaration
-  size_t i = 0; // initialized at declaration
+  std::span<const unsigned char> bytes_span(reinterpret_cast<const unsigned char*>(str.data()), str.size());
+  const int MAX_ASCII_CODE_POINT = 0x7F;
+  const int CONT_BYTE_MASK = 0xC0;
+  const int CONT_BYTE_PATTERN = 0x80;
+  const int TWO_BYTE_MASK = 0xE0;
+  const int TWO_BYTE_PATTERN = 0xC0;
+  const int THREE_BYTE_MASK = 0xF0;
+  const int THREE_BYTE_PATTERN = 0xE0;
+  const int FOUR_BYTE_MASK = 0xF8;
+  const int FOUR_BYTE_PATTERN = 0xF0;
+  size_t len = bytes_span.size();
+  size_t i = 0;
   while (i < len) {
-    if (bytes[i] <= 0x7F) {
+    if (bytes_span[i] <= MAX_ASCII_CODE_POINT) {
       i++;
       continue;
     }
-    if ((bytes[i] & 0xE0) == 0xC0) {
-      if (i + 1 >= len || (bytes[i + 1] & 0xC0) != 0x80)
+    if ((bytes_span[i] & TWO_BYTE_MASK) == TWO_BYTE_PATTERN) {
+      if (i + 1 >= len || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 2;
       continue;
     }
-    if ((bytes[i] & 0xF0) == 0xE0) {
-      if (i + 2 >= len || (bytes[i + 1] & 0xC0) != 0x80 ||
-          (bytes[i + 2] & 0xC0) != 0x80)
+    if ((bytes_span[i] & THREE_BYTE_MASK) == THREE_BYTE_PATTERN) {
+      if (i + 2 >= len || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
+          (bytes_span[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 3;
       continue;
     }
-    if ((bytes[i] & 0xF8) == 0xF0) {
-      if ((i + 3 >= len) || (bytes[i + 1] & 0xC0) != 0x80 ||
-          (bytes[i + 2] & 0xC0) != 0x80 || (bytes[i + 3] & 0xC0) != 0x80)
+    if ((bytes_span[i] & FOUR_BYTE_MASK) == FOUR_BYTE_PATTERN) {
+      if ((i + 3 >= len) || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
+          (bytes_span[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN || (bytes_span[i + 3] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 4;
       continue;

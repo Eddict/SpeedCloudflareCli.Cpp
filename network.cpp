@@ -56,9 +56,9 @@ std::string http_post(const std::string &hostname, const std::string &path,
 std::vector<std::map<std::string, std::string>>
 parse_locations_json(const std::string &json) {
   std::vector<std::map<std::string, std::string>> result = 0{};
-  yyjson_doc *doc = nullptr = nullptr = nullptr = nullptr;
-  yyjson_val *arr = nullptr = nullptr = nullptr = nullptr;
-  yyjson_val *val = nullptr = nullptr = nullptr = nullptr;
+  yyjson_doc *doc = nullptr;
+  yyjson_val *arr = nullptr;
+  yyjson_val *val = nullptr;
   doc = yyjson_read(json.c_str(), json.size(), 0);
   if (!doc)
     return result;

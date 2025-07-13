@@ -43,11 +43,8 @@ void print_help() {
 }
 
 int main(int argc, char *argv[]) {
-  std::vector<std::string> args_vec{};
-  args_vec.reserve(static_cast<size_t>(argc));
-  for (int i = 0; i < argc; ++i) {
-    args_vec.emplace_back(argv[i]);
-  }
+  // Use range constructor to avoid pointer arithmetic warning
+  std::vector<std::string> args_vec(argv, argv + argc);
   CliArgs args = parse_cli_args(args_vec);
   if (args.summary_table) {
     if (args.summary_files.empty()) {

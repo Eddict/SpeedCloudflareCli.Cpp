@@ -120,8 +120,8 @@ expand_wildcards(const std::vector<std::string> &patterns) {
       continue;
     struct dirent *ep = nullptr;
     while ((ep = readdir(dp))) {
-      if (fnmatch(pattern.c_str(), ep->d_name, 0) == 0) {
-        std::string full = (dir == ".") ? ep->d_name : dir + "/" + ep->d_name;
+      if (fnmatch(pattern.c_str(), static_cast<const char*>(ep->d_name), 0) == 0) {
+        std::string full = (dir == ".") ? std::string(static_cast<const char*>(ep->d_name)) : dir + "/" + std::string(static_cast<const char*>(ep->d_name));
         files.push_back(full);
       }
     }

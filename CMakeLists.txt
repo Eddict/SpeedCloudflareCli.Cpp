@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(SpeedCloudflareCli)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
 
@@ -51,13 +51,11 @@ add_executable(SpeedCloudflareCli
 
 target_link_libraries(SpeedCloudflareCli PRIVATE pthread ${CURL_LIBRARIES} yyjson)
 
-#target_include_directories(yyjson PUBLIC "${CMAKE_CURRENT_LIST_DIR}/include") # or whatever path
-#target_include_directories(yyjson PUBLIC  
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/yyjson>  
-#    $<INSTALL_INTERFACE:include/yyjson>  # <prefix>/include/yyjson
-#)
-
-#set_property(TARGET yyjson PROPERTY SYSTEM TRUE)
-
 # nlohmann_json and json-schema-validator integration
 include(cmake/nlohmann_json_schema.cmake)
+
+target_include_directories(SpeedCloudflareCli PRIVATE
+  ${CMAKE_BINARY_DIR}/_deps/yyjson-src/src
+  ${json-schema-validator_SOURCE_DIR}/src
+  ${CMAKE_BINARY_DIR}/_deps/json-schema-validator-src/src
+)

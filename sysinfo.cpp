@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sched.h>
 #include <string>
+#include <string_view>
 #include <sys/resource.h>
 #include <sys/utsname.h>
 #include <thread>
@@ -31,15 +32,19 @@ void print_sysinfo(bool mask_sensitive) {
   std::cout << "[SYS] Version: " << BUILD_VERSION << std::endl;
   struct utsname uts{};
   if (uname(&uts) == 0) {
-    std::string host(uts.nodename);
+    std::string_view nodename_sv(static_cast<const char*>(uts.nodename), std::char_traits<char>::length(static_cast<const char*>(uts.nodename)));
+    std::string_view machine_sv(static_cast<const char*>(uts.machine), std::char_traits<char>::length(static_cast<const char*>(uts.machine)));
+    std::string_view sysname_sv(static_cast<const char*>(uts.sysname), std::char_traits<char>::length(static_cast<const char*>(uts.sysname)));
+    std::string_view release_sv(static_cast<const char*>(uts.release), std::char_traits<char>::length(static_cast<const char*>(uts.release)));
+    std::string host(nodename_sv);
     if (mask_sensitive && !host.empty()) {
       size_t len = host.length();
       if (len > 3)
         host.replace(len / 2, len - len / 2, std::string(len - len / 2, '*'));
     }
     std::cout << "[SYS] Host: " << host << std::endl;
-    std::cout << "[SYS] Arch: " << std::string(uts.machine) << std::endl;
-    std::cout << "[SYS] Kernel: " << std::string(uts.sysname) << " " << std::string(uts.release) << std::endl;
+    std::cout << "[SYS] Arch: " << std::string(machine_sv) << std::endl;
+    std::cout << "[SYS] Kernel: " << std::string(sysname_sv) << " " << std::string(release_sv) << std::endl;
   }
   std::ifstream cpuinfo("/proc/cpuinfo");
   std::string line, model;
@@ -100,9 +105,13 @@ void collect_sysinfo(TestResults &res, bool mask_sensitive) {
   res.version = BUILD_VERSION;
   struct utsname uts{};
   if (uname(&uts) == 0) {
-    res.host = mask_sensitive ? mask_str(std::string(uts.nodename)) : std::string(uts.nodename);
-    res.arch = std::string(uts.machine);
-    res.kernel = std::string(uts.sysname) + " " + std::string(uts.release);
+    std::string_view nodename_sv(static_cast<const char*>(uts.nodename), std::char_traits<char>::length(static_cast<const char*>(uts.nodename)));
+    std::string_view machine_sv(static_cast<const char*>(uts.machine), std::char_traits<char>::length(static_cast<const char*>(uts.machine)));
+    std::string_view sysname_sv(static_cast<const char*>(uts.sysname), std::char_traits<char>::length(static_cast<const char*>(uts.sysname)));
+    std::string_view release_sv(static_cast<const char*>(uts.release), std::char_traits<char>::length(static_cast<const char*>(uts.release)));
+    res.host = mask_sensitive ? mask_str(std::string(nodename_sv)) : std::string(nodename_sv);
+    res.arch = std::string(machine_sv);
+    res.kernel = std::string(sysname_sv) + " " + std::string(release_sv);
   }
   std::ifstream cpuinfo("/proc/cpuinfo");
   std::string line, model;
@@ -136,10 +145,9 @@ void pin_to_core(int core_id) {
 void set_nice() { setpriority(PRIO_PROCESS, 0, kNiceValue); }
 
 void drop_caches() {
-  FILE *f = fopen("/proc/sys/vm/drop_caches", "w");
+  std::unique_ptr<FILE, decltype(&fclose)> f(fopen("/proc/sys/vm/drop_caches", "w"), &fclose);
   if (f) {
-    fputs("3\n", f);
-    fclose(f);
+    fputs("3\n", f.get());
   }
 }
 

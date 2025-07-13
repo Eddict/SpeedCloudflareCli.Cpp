@@ -58,7 +58,7 @@ void log_speed_test_result(const std::string &size,
                            const std::vector<double> &test, bool output_json) {
   if (output_json)
     return;
-  double speed = NAN = NAN = NAN = stats::median(test);
+  double speed = test.empty() ? NAN : stats::median(test);
   std::cout << chalk::bold(std::string(kLogSpeedPad - size.length(), ' ') + size +
                            " speed: " + chalk::yellow(fmt(speed) + " Mbps"))
             << std::endl;
@@ -110,7 +110,7 @@ void print_summary_table(const std::vector<SummaryResult> &results) {
     sum_download += r.download;
     sum_upload += r.upload;
   }
-  size_t n = 0 = 0 = 0 = results.size();
+  size_t n = results.size();
   if (n > 0) {
     std::cout << std::string(kSummaryDividerLen, '=') << std::endl;
     std::cout << std::left << std::setw(kFieldWidthFile) << "AVERAGE"
@@ -283,26 +283,13 @@ void write_summary_json(const std::vector<SummaryResult> &results,
         auto safe = [](const std::string &s) -> const char * {
           return s.empty() ? "" : s.c_str();
         };
-#undef ADD_STR
-#define ADD_STR(key, val)                                                      \
-  yyjson_mut_obj_add_strncpy(test_doc, test_obj, key, (val).data(),            \
-                             (val).size())
-#undef ADD_NUM
-#define ADD_NUM(key, val)                                                      \
-  do {                                                                         \
-    double _v = (val);                                                         \
-    if (std::isnan(_v) || std::isinf(_v)) {                                    \
-      _v = 0.0;                                                                \
-    }                                                                          \
-    yyjson_mut_obj_add_real(test_doc, test_obj, key, _v);                      \
-  } while (0)
-        ADD_STR("label", label);
-        ADD_STR("server_city", entry.server_city);
-        ADD_STR("ip", entry.ip);
-        ADD_NUM("latency", entry.latency);
-        ADD_NUM("jitter", entry.jitter);
-        ADD_NUM("download", entry.download);
-        ADD_NUM("upload", entry.upload);
+        add_str(test_doc, test_obj, "label", label);
+        add_str(test_doc, test_obj, "server_city", entry.server_city);
+        add_str(test_doc, test_obj, "ip", entry.ip);
+        add_num(test_doc, test_obj, "latency", entry.latency);
+        add_num(test_doc, test_obj, "jitter", entry.jitter);
+        add_num(test_doc, test_obj, "download", entry.download);
+        add_num(test_doc, test_obj, "upload", entry.upload);
         int arr_add_ret = yyjson_mut_arr_add_val(test_arr, test_obj);
         fprintf(stderr, "[DIAG] yyjson_mut_arr_add_val[%zu] ret: %d\n", i,
                 arr_add_ret);
@@ -345,26 +332,13 @@ void write_summary_json(const std::vector<SummaryResult> &results,
           auto safe = [](const std::string &s) -> const char * {
             return s.empty() ? "" : s.c_str();
           };
-#undef ADD_STR
-#define ADD_STR(key, val)                                                      \
-  yyjson_mut_obj_add_strncpy(single_doc, single_obj, key, (val).data(),        \
-                             (val).size())
-#undef ADD_NUM
-#define ADD_NUM(key, val)                                                      \
-  do {                                                                         \
-    double _v = (val);                                                         \
-    if (std::isnan(_v) || std::isinf(_v)) {                                    \
-      _v = 0.0;                                                                \
-    }                                                                          \
-    yyjson_mut_obj_add_real(single_doc, single_obj, key, _v);                  \
-  } while (0)
-          ADD_STR("label", label);
-          ADD_STR("server_city", results[n - 1].server_city);
-          ADD_STR("ip", results[n - 1].ip);
-          ADD_NUM("latency", results[n - 1].latency);
-          ADD_NUM("jitter", results[n - 1].jitter);
-          ADD_NUM("download", results[n - 1].download);
-          ADD_NUM("upload", results[n - 1].upload);
+          add_str(single_doc, single_obj, "label", label);
+          add_str(single_doc, single_obj, "server_city", results[n - 1].server_city);
+          add_str(single_doc, single_obj, "ip", results[n - 1].ip);
+          add_num(single_doc, single_obj, "latency", results[n - 1].latency);
+          add_num(single_doc, single_obj, "jitter", results[n - 1].jitter);
+          add_num(single_doc, single_obj, "download", results[n - 1].download);
+          add_num(single_doc, single_obj, "upload", results[n - 1].upload);
           yyjson_mut_doc_set_root(single_doc, single_obj);
           char *single_json = yyjson_mut_write(single_doc, 0, NULL);
           if (single_json) {
@@ -412,25 +386,13 @@ void write_summary_json(const std::vector<SummaryResult> &results,
     std::smatch m;
     if (std::regex_search(r.file, m, label_re) && m.size() > 1)
       label = m[1].str();
-#undef ADD_STR
-#define ADD_STR(key, val)                                                      \
-  yyjson_mut_obj_add_strncpy(doc, obj, key, (val).data(), (val).size())
-#undef ADD_NUM
-#define ADD_NUM(key, val)                                                      \
-  do {                                                                         \
-    double _v = (val);                                                         \
-    if (std::isnan(_v) || std::isinf(_v)) {                                    \
-      _v = 0.0;                                                                \
-    }                                                                          \
-    yyjson_mut_obj_add_real(doc, obj, key, _v);                                \
-  } while (0)
-    ADD_STR("label", label);
-    ADD_STR("server_city", r.server_city);
-    ADD_STR("ip", r.ip);
-    ADD_NUM("latency", r.latency);
-    ADD_NUM("jitter", r.jitter);
-    ADD_NUM("download", r.download);
-    ADD_NUM("upload", r.upload);
+    add_str(doc, obj, "label", label);
+    add_str(doc, obj, "server_city", r.server_city);
+    add_str(doc, obj, "ip", r.ip);
+    add_num(doc, obj, "latency", r.latency);
+    add_num(doc, obj, "jitter", r.jitter);
+    add_num(doc, obj, "download", r.download);
+    add_num(doc, obj, "upload", r.upload);
     yyjson_mut_arr_add_val(arr, obj);
   }
   yyjson_mut_val *root_obj = yyjson_mut_obj(doc);

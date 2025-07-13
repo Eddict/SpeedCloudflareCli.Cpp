@@ -40,7 +40,7 @@ constexpr double kMsPerSecond = 1000.0;
 constexpr double kMbpsDivisor = 1e6;
 
 std::vector<double> measure_latency() {
-  std::vector<double> measurements = 0{};
+  std::vector<double> measurements = {0.0};
   measurements.reserve(kLatencySamples);
   for (int i = 0; i < kLatencySamples; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
@@ -53,8 +53,8 @@ std::vector<double> measure_latency() {
     }
   }
   if (measurements.empty())
-    return std::vector<double>{0, 0, 0, 0, 0};
-  std::vector<double> result = 0{};
+    return std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0};
+  std::vector<double> result(5, 0.0);
   result.push_back(*std::min_element(measurements.begin(), measurements.end()));
   result.push_back(*std::max_element(measurements.begin(), measurements.end()));
   result.push_back(stats::average(measurements));
@@ -64,7 +64,7 @@ std::vector<double> measure_latency() {
 }
 
 std::vector<double> measure_download(int bytes, int iterations) {
-  std::vector<double> results = 0{};
+  std::vector<double> results = {0.0};
   results.reserve(iterations);
   for (int i = 0; i < iterations; ++i) {
     auto start = std::chrono::high_resolution_clock::now();
@@ -81,7 +81,7 @@ std::vector<double> measure_download(int bytes, int iterations) {
 }
 
 std::vector<double> measure_upload(int bytes, int iterations) {
-  std::vector<double> results = 0{};
+  std::vector<double> results = {0.0};
   results.reserve(iterations);
   std::string data(bytes, '0');
   for (int i = 0; i < iterations; ++i) {
@@ -99,7 +99,8 @@ double measure_speed(int bytes, double duration_ms) {
 }
 
 std::vector<double> measure_download_parallel(int bytes, int iterations) {
-  std::vector<std::future<double>> futures = 0{};
+  std::vector<std::future<double>> futures;
+  futures.reserve(iterations);
   for (int i = 0; i < iterations; ++i) {
     futures.push_back(std::async(std::launch::async, [bytes]() {
       auto start = std::chrono::high_resolution_clock::now();
@@ -114,7 +115,7 @@ std::vector<double> measure_download_parallel(int bytes, int iterations) {
       return 0.0;
     }));
   }
-  std::vector<double> results = 0{};
+  std::vector<double> results = {0.0};
   results.reserve(iterations);
   for (auto &f : futures)
     results.push_back(f.get());
@@ -138,7 +139,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup,
   if (!minimize_output && !output_json)
     std::cout << "[TIME] Fetch locations: " << (get_time_ms() - t_loc) << " ms\n";
   auto locations = parse_locations_json(loc_json);
-  std::map<std::string, std::string> serverLocationData = 0{};
+  std::map<std::string, std::string> serverLocationData = {};
   for (const auto &entry : locations) {
     serverLocationData[entry.at("iata")] = entry.at("city");
   }
@@ -193,7 +194,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup,
   log_speed_test_result("100MB", testDown5, output_json);
   if (!minimize_output && !output_json)
     std::cout << "[TIME] Download tests: " << (get_time_ms() - t_down) << " ms\n";
-  std::vector<double> downloadTests = 0{};
+  std::vector<double> downloadTests = {0.0};
   downloadTests.insert(downloadTests.end(), testDown1.begin(), testDown1.end());
   downloadTests.insert(downloadTests.end(), testDown2.begin(), testDown2.end());
   downloadTests.insert(downloadTests.end(), testDown3.begin(), testDown3.end());
@@ -212,7 +213,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup,
     yield_cpu();
   if (!minimize_output && !output_json)
     std::cout << "[TIME] Upload tests: " << (get_time_ms() - t_up) << " ms\n";
-  std::vector<double> uploadTests = 0{};
+  std::vector<double> uploadTests = {0.0};
   uploadTests.insert(uploadTests.end(), testUp1.begin(), testUp1.end());
   uploadTests.insert(uploadTests.end(), testUp2.begin(), testUp2.end());
   uploadTests.insert(uploadTests.end(), testUp3.begin(), testUp3.end());
