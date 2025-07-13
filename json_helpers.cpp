@@ -6,13 +6,20 @@
 #include <string>
 #include <vector>
 #include <yyjson.h>
-#include <span>
 
 void add_str(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, const std::string &val, const std::function<const char*(const std::string&)>& safe) {
     yyjson_mut_obj_add_str(doc, obj, key, safe(val));
 }
 void add_num(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, double val) {
     yyjson_mut_obj_add_real(doc, obj, key, val);
+}
+
+// Overload for compatibility with output.cpp usage
+void add_str(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, const std::string &val) {
+    auto safe = [](const std::string &s) -> const char * {
+        return s.empty() ? "" : s.c_str();
+    };
+    yyjson_mut_obj_add_str(doc, obj, key, safe(val));
 }
 
 std::string serialize_to_json(const TestResults &res) {
@@ -77,7 +84,8 @@ double percentile(const std::vector<double> &v, double pct) {
 }
 
 bool is_valid_utf8(const std::string &str) {
-  std::span<const unsigned char> bytes_span(reinterpret_cast<const unsigned char*>(str.data()), str.size());
+  const unsigned char* bytes = reinterpret_cast<const unsigned char*>(str.data());
+  size_t len = str.size();
   const int MAX_ASCII_CODE_POINT = 0x7F;
   const int CONT_BYTE_MASK = 0xC0;
   const int CONT_BYTE_PATTERN = 0x80;
@@ -87,29 +95,28 @@ bool is_valid_utf8(const std::string &str) {
   const int THREE_BYTE_PATTERN = 0xE0;
   const int FOUR_BYTE_MASK = 0xF8;
   const int FOUR_BYTE_PATTERN = 0xF0;
-  size_t len = bytes_span.size();
   size_t i = 0;
   while (i < len) {
-    if (bytes_span[i] <= MAX_ASCII_CODE_POINT) {
+    if (bytes[i] <= MAX_ASCII_CODE_POINT) {
       i++;
       continue;
     }
-    if ((bytes_span[i] & TWO_BYTE_MASK) == TWO_BYTE_PATTERN) {
-      if (i + 1 >= len || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
+    if ((bytes[i] & TWO_BYTE_MASK) == TWO_BYTE_PATTERN) {
+      if (i + 1 >= len || (bytes[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 2;
       continue;
     }
-    if ((bytes_span[i] & THREE_BYTE_MASK) == THREE_BYTE_PATTERN) {
-      if (i + 2 >= len || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
-          (bytes_span[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
+    if ((bytes[i] & THREE_BYTE_MASK) == THREE_BYTE_PATTERN) {
+      if (i + 2 >= len || (bytes[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
+          (bytes[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 3;
       continue;
     }
-    if ((bytes_span[i] & FOUR_BYTE_MASK) == FOUR_BYTE_PATTERN) {
-      if ((i + 3 >= len) || (bytes_span[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
-          (bytes_span[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN || (bytes_span[i + 3] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
+    if ((bytes[i] & FOUR_BYTE_MASK) == FOUR_BYTE_PATTERN) {
+      if ((i + 3 >= len) || (bytes[i + 1] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN ||
+          (bytes[i + 2] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN || (bytes[i + 3] & CONT_BYTE_MASK) != CONT_BYTE_PATTERN)
         return false;
       i += 4;
       continue;

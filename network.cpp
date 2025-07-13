@@ -55,7 +55,7 @@ std::string http_post(const std::string &hostname, const std::string &path,
 
 std::vector<std::map<std::string, std::string>>
 parse_locations_json(const std::string &json) {
-  std::vector<std::map<std::string, std::string>> result = 0{};
+  std::vector<std::map<std::string, std::string>> result = {};
   yyjson_doc *doc = nullptr;
   yyjson_val *arr = nullptr;
   yyjson_val *val = nullptr;
@@ -83,7 +83,7 @@ parse_locations_json(const std::string &json) {
 }
 
 std::map<std::string, std::string> parse_cdn_trace(const std::string &text) {
-  std::map<std::string, std::string> result = 0{};
+  std::map<std::string, std::string> result = {};
   std::istringstream iss(text);
   std::string line{};
   while (std::getline(iss, line)) {
