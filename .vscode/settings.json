@@ -1,0 +1,16 @@
+{
+    "clangd.arguments": [
+        "--query-driver=/root/gcc-linaro_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-g++"
+    ],
+    "[cpp]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "[c]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "C_Cpp.clang_format_style": "file"
+}

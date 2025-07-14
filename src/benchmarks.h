@@ -12,7 +12,6 @@ auto measure_upload(int bytes, int iterations) -> std::vector<double>;
 auto measure_speed(int bytes, double duration_ms) -> double;
 
 // Main speed test
-auto speed_test(bool use_parallel = false, bool minimize_output = false,
-                bool warmup = true, bool do_yield = true,
-                bool mask_sensitive = false, bool output_json = false,
-                TestResults *json_results = nullptr) -> void;
+auto speed_test(bool use_parallel = false, bool minimize_output = false, bool warmup = true,
+                bool do_yield = true, bool mask_sensitive = false, bool output_json = false,
+                TestResults* json_results = nullptr) -> void;

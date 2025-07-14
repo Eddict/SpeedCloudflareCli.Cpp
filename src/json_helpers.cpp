@@ -9,29 +9,33 @@
 
 constexpr double kPercentile90 = 0.9;
 
-// Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one declaration per statement, no implicit conversions
+// Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one
+// declaration per statement, no implicit conversions
 
-void add_str(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, const std::string &value, const std::function<const char*(const std::string&)>& safe) {
-    yyjson_mut_obj_add_str(doc, obj, key, safe(value));
+void add_str(yyjson_mut_doc* doc, yyjson_mut_val* obj, const char* key, const std::string& value,
+             const std::function<const char*(const std::string&)>& safe)
+{
+  yyjson_mut_obj_add_str(doc, obj, key, safe(value));
 }
-void add_num(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, double value) {
-    yyjson_mut_obj_add_real(doc, obj, key, value);
+void add_num(yyjson_mut_doc* doc, yyjson_mut_val* obj, const char* key, double value)
+{
+  yyjson_mut_obj_add_real(doc, obj, key, value);
 }
 
 // Overload for compatibility with output.cpp usage
-void add_str(yyjson_mut_doc *doc, yyjson_mut_val *obj, const char *key, const std::string &value) {
-    auto safe = [](const std::string &input) -> const char * {
-        return input.empty() ? "" : input.c_str();
-    };
-    yyjson_mut_obj_add_str(doc, obj, key, safe(value));
+void add_str(yyjson_mut_doc* doc, yyjson_mut_val* obj, const char* key, const std::string& value)
+{
+  auto safe = [](const std::string& input) -> const char*
+  { return input.empty() ? "" : input.c_str(); };
+  yyjson_mut_obj_add_str(doc, obj, key, safe(value));
 }
 
-auto serialize_to_json(const TestResults &results) -> std::string {
-  auto safe = [](const std::string &input) -> const char * {
-    return input.empty() ? "" : input.c_str();
-  };
-  yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
-  yyjson_mut_val *obj = yyjson_mut_obj(doc);
+auto serialize_to_json(const TestResults& results) -> std::string
+{
+  auto safe = [](const std::string& input) -> const char*
+  { return input.empty() ? "" : input.c_str(); };
+  yyjson_mut_doc* doc = yyjson_mut_doc_new(nullptr);
+  yyjson_mut_val* obj = yyjson_mut_obj(doc);
   yyjson_mut_doc_set_root(doc, obj);
   add_str(doc, obj, "sysinfo_date", results.sysinfo_date, safe);
   add_str(doc, obj, "server_city", results.city, safe);
@@ -45,9 +49,11 @@ auto serialize_to_json(const TestResults &results) -> std::string {
   add_str(doc, obj, "mem_total", results.mem_total, safe);
   add_str(doc, obj, "version", results.version, safe);
   yyjson_mut_obj_add_int(doc, obj, "cpu_cores", results.cpu_cores);
-  auto add_vec = [&](const char *key, const std::vector<double> &values) {
-    yyjson_mut_val *arr = yyjson_mut_arr(doc);
-    for (double value : values) {
+  auto add_vec = [&](const char* key, const std::vector<double>& values)
+  {
+    yyjson_mut_val* arr = yyjson_mut_arr(doc);
+    for (double value : values)
+    {
       yyjson_mut_arr_add_real(doc, arr, value);
     }
     yyjson_mut_obj_add_val(doc, obj, key, arr);
@@ -68,8 +74,9 @@ auto serialize_to_json(const TestResults &results) -> std::string {
   add_num(doc, obj, "jitter", results.latency.size() > 4 ? results.latency[4] : 0.0);
   add_num(doc, obj, "download_90pct", percentile(results.all_downloads, kPercentile90));
   add_num(doc, obj, "upload_90pct", percentile(results.all_uploads, kPercentile90));
-  yyjson_mut_val *flags_arr = yyjson_mut_arr(doc);
-  for (const auto &flag : results.flags) {
+  yyjson_mut_val* flags_arr = yyjson_mut_arr(doc);
+  for (const auto& flag : results.flags)
+  {
     yyjson_mut_arr_add_str(doc, flags_arr, flag.c_str());
   }
   yyjson_mut_obj_add_val(doc, obj, "flags", flags_arr);
@@ -78,20 +85,24 @@ auto serialize_to_json(const TestResults &results) -> std::string {
   return out;
 }
 
-auto percentile(const std::vector<double> &values, double percentile_value) -> double {
-  if (values.empty()) {
+auto percentile(const std::vector<double>& values, double percentile_value) -> double
+{
+  if (values.empty())
+  {
     return 0.0;
   }
   std::vector<double> sorted = values;
   std::sort(sorted.begin(), sorted.end());
   size_t sorted_index = static_cast<size_t>(std::ceil(percentile_value * sorted.size())) - 1;
-  if (sorted_index >= sorted.size()) {
+  if (sorted_index >= sorted.size())
+  {
     sorted_index = sorted.size() - 1;
   }
   return sorted[sorted_index];
 }
 
-auto is_valid_utf8(const std::string &input) -> bool {
+auto is_valid_utf8(const std::string& input) -> bool
+{
   const size_t input_length = input.size();
   const int kMaxAsciiCodePoint = 0x7F;
   const int kContByteMask = 0xC0;
@@ -103,33 +114,42 @@ auto is_valid_utf8(const std::string &input) -> bool {
   const int kFourByteMask = 0xF8;
   const int kFourBytePattern = 0xF0;
   size_t index = 0;
-  while (index < input_length) {
+  while (index < input_length)
+  {
     unsigned char c = static_cast<unsigned char>(input[index]);
-    if (c <= kMaxAsciiCodePoint) {
+    if (c <= kMaxAsciiCodePoint)
+    {
       index++;
       continue;
     }
-    if ((c & kTwoByteMask) == kTwoBytePattern) {
-      if (index + 1 >= input_length || (static_cast<unsigned char>(input[index + 1]) & kContByteMask) != kContBytePattern) {
+    if ((c & kTwoByteMask) == kTwoBytePattern)
+    {
+      if (index + 1 >= input_length ||
+          (static_cast<unsigned char>(input[index + 1]) & kContByteMask) != kContBytePattern)
+      {
         return false;
       }
       index += 2;
       continue;
     }
-    if ((c & kThreeByteMask) == kThreeBytePattern) {
+    if ((c & kThreeByteMask) == kThreeBytePattern)
+    {
       if (index + 2 >= input_length ||
           (static_cast<unsigned char>(input[index + 1]) & kContByteMask) != kContBytePattern ||
-          (static_cast<unsigned char>(input[index + 2]) & kContByteMask) != kContBytePattern) {
+          (static_cast<unsigned char>(input[index + 2]) & kContByteMask) != kContBytePattern)
+      {
         return false;
       }
       index += 3;
       continue;
     }
-    if ((c & kFourByteMask) == kFourBytePattern) {
+    if ((c & kFourByteMask) == kFourBytePattern)
+    {
       if (index + 3 >= input_length ||
           (static_cast<unsigned char>(input[index + 1]) & kContByteMask) != kContBytePattern ||
           (static_cast<unsigned char>(input[index + 2]) & kContByteMask) != kContBytePattern ||
-          (static_cast<unsigned char>(input[index + 3]) & kContByteMask) != kContBytePattern) {
+          (static_cast<unsigned char>(input[index + 3]) & kContByteMask) != kContBytePattern)
+      {
         return false;
       }
       index += 4;

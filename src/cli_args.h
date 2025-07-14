@@ -3,7 +3,8 @@
 #include <vector>
 
 // Modernized: trailing return types, descriptive parameter names
-struct CliArgs {
+struct CliArgs
+{
   bool use_parallel = false;
   bool minimize_output = false;
   bool warmup = true;
