@@ -4,36 +4,53 @@
 
 namespace stats {
 constexpr double kTwo = 2.0;
-double average(const std::vector<double> &values) {
-  if (values.empty()) return 0.0;
+// Modernized: trailing return types, braces, descriptive variable names, auto, nullptr, one declaration per statement, no implicit conversions
+
+auto average(const std::vector<double> &values) -> double {
+  if (values.empty()) {
+    return 0.0;
+  }
   double total = 0.0;
-  for (double v : values)
-    total += v;
+  for (const double value : values) {
+    total += value;
+  }
   return total / static_cast<double>(values.size());
 }
-double median(std::vector<double> values) {
-  size_t n = values.size();
-  if (n == 0) return 0.0;
+
+auto median(std::vector<double> values) -> double {
+  const size_t value_count = values.size();
+  if (value_count == 0) {
+    return 0.0;
+  }
   std::sort(values.begin(), values.end());
-  if (n % 2)
-    return values[n / 2];
-  return (values[n / 2 - 1] + values[n / 2]) / kTwo;
+  if (value_count % 2) {
+    return values[value_count / 2];
+  }
+  return (values[value_count / 2 - 1] + values[value_count / 2]) / kTwo;
 }
-double quartile(std::vector<double> values, double percentile) {
-  if (values.empty()) return 0.0;
+
+auto quartile(std::vector<double> values, double percentile) -> double {
+  if (values.empty()) {
+    return 0.0;
+  }
   std::sort(values.begin(), values.end());
-  double pos = static_cast<double>(values.size() - 1) * percentile;
-  size_t base = static_cast<size_t>(std::floor(pos));
-  double rest = pos - static_cast<double>(base);
-  if (base + 1 < values.size())
-    return values[base] + rest * (values[base + 1] - values[base]);
-  return values[base];
+  const double position = static_cast<double>(values.size() - 1) * percentile;
+  const size_t base_index = static_cast<size_t>(std::floor(position));
+  const double remainder = position - static_cast<double>(base_index);
+  if (base_index + 1 < values.size()) {
+    return values[base_index] + remainder * (values[base_index + 1] - values[base_index]);
+  }
+  return values[base_index];
 }
-double jitter(const std::vector<double> &values) {
-  if (values.size() < 2) return 0.0;
+
+auto jitter(const std::vector<double> &values) -> double {
+  if (values.size() < 2) {
+    return 0.0;
+  }
   std::vector<double> jitters{};
-  for (size_t i = 0; i + 1 < values.size(); ++i)
-    jitters.push_back(std::abs(values[i] - values[i + 1]));
+  for (size_t index = 0; index + 1 < values.size(); ++index) {
+    jitters.push_back(std::abs(values[index] - values[index + 1]));
+  }
   return average(jitters);
 }
 } // namespace stats

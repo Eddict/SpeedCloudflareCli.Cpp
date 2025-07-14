@@ -8,6 +8,7 @@ include(FetchContent)
 # nlohmann_json (header-only)
 FetchContent_Declare(
   nlohmann_json
+  SYSTEM
   GIT_REPOSITORY https://github.com/nlohmann/json.git
   GIT_TAG v3.12.0
 )
@@ -16,6 +17,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 # json-schema-validator (header-only, depends on nlohmann_json)
 FetchContent_Declare(
   json-schema-validator
+  SYSTEM
   GIT_REPOSITORY https://github.com/pboettch/json-schema-validator.git
   GIT_TAG 2.3.0
 )

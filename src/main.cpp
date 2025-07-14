@@ -10,6 +10,8 @@
 #include <iostream>
 #include <string_view>
 
+// Modernized: trailing return types, braces, descriptive variable names, auto, nullptr, one declaration per statement, no implicit conversions
+
 void print_help() {
   std::cout << "Usage: SpeedCloudflareCli [options]\n";
   std::cout << "  --parallel, -p           Use parallel download tests "
@@ -42,10 +44,9 @@ void print_help() {
   std::cout << "  --help, -h               Show this help message\n";
 }
 
-int main(int argc, char *argv[]) {
-  // Use range constructor to avoid pointer arithmetic warning
-  std::vector<std::string> args_vec(argv, argv + argc);
-  CliArgs args = parse_cli_args(args_vec);
+auto main(int argc, char *argv[]) -> int {
+  std::vector<std::string> argument_vector(argv, argv + argc);
+  CliArgs args = parse_cli_args(argument_vector);
   if (args.summary_table) {
     if (args.summary_files.empty()) {
       std::cerr << "[ERROR] --summary-table requires at least one JSON file as "
@@ -53,33 +54,38 @@ int main(int argc, char *argv[]) {
                 << std::endl;
       return 1;
     }
-    for (const auto &file : args.summary_files) {
-      validate_json_schema(file, "result.schema.json", args.diagnostics_mode);
+    for (const auto &summary_file : args.summary_files) {
+      validate_json_schema(summary_file, "result.schema.json", args.diagnostics_mode);
     }
-    auto results = load_summary_results(args.summary_files,
-                                        args.diagnostics_mode, args.debug_mode);
-    print_summary_table(results);
+    auto summary_results = load_summary_results(args.summary_files,
+                                               args.diagnostics_mode, args.debug_mode);
+    print_summary_table(summary_results);
     std::string summary_path = std::string("results/") + SUMMARY_JSON_FILENAME;
-    write_summary_json(results, summary_path, args.diagnostics_mode,
+    write_summary_json(summary_results, summary_path, args.diagnostics_mode,
                        args.debug_mode);
     validate_json_schema(summary_path, "summary.schema.json",
                          args.diagnostics_mode);
-    if (args.diagnostics_mode)
+    if (args.diagnostics_mode) {
       yyjson_minimal_test(args.diagnostics_mode, args.debug_mode);
+    }
     return 0;
   }
   if (args.show_sysinfo_only) {
     print_sysinfo(args.mask_sensitive);
     return 0;
   }
-  if (args.show_sysinfo)
+  if (args.show_sysinfo) {
     print_sysinfo(args.mask_sensitive);
-  if (args.pin_single_core)
+  }
+  if (args.pin_single_core) {
     pin_to_core(0);
-  if (args.do_nice)
+  }
+  if (args.do_nice) {
     set_nice();
-  if (args.do_drop_caches)
+  }
+  if (args.do_drop_caches) {
     drop_caches();
+  }
   if (args.output_json) {
     TestResults results;
     speed_test(args.use_parallel, args.minimize_output, args.warmup,
@@ -89,7 +95,8 @@ int main(int argc, char *argv[]) {
     speed_test(args.use_parallel, args.minimize_output, args.warmup,
                args.do_yield, args.mask_sensitive, args.output_json);
   }
-  if (args.debug_mode || args.diagnostics_mode)
+  if (args.debug_mode || args.diagnostics_mode) {
     yyjson_minimal_test(args.diagnostics_mode, args.debug_mode);
+  }
   return 0;
 }

@@ -38,64 +38,66 @@ constexpr int kUploadIters3 = 8;
 constexpr double kBitsPerByte = 8.0;
 constexpr double kMsPerSecond = 1000.0;
 constexpr double kMbpsDivisor = 1e6;
+constexpr int kNumLatencyStats = 5;
 
-std::vector<double> measure_latency() {
-  std::vector<double> measurements = {0.0};
+auto measure_latency() -> std::vector<double> {
+  std::vector<double> measurements;
   measurements.reserve(kLatencySamples);
-  for (int i = 0; i < kLatencySamples; ++i) {
-    auto start = std::chrono::high_resolution_clock::now();
-    std::string resp = http_get("speed.cloudflare.com", "/__down?bytes=1000");
-    auto end = std::chrono::high_resolution_clock::now();
-    if (!resp.empty()) {
-      double ms =
-          std::chrono::duration<double, std::milli>(end - start).count();
-      measurements.push_back(ms);
+  for (int sample_index = 0; sample_index < kLatencySamples; ++sample_index) {
+    const auto start_time = std::chrono::high_resolution_clock::now();
+    const std::string response = http_get("speed.cloudflare.com", "/__down?bytes=1000");
+    const auto end_time = std::chrono::high_resolution_clock::now();
+    if (!response.empty()) {
+      const double milliseconds =
+          std::chrono::duration<double, std::milli>(end_time - start_time).count();
+      measurements.push_back(milliseconds);
     }
   }
-  if (measurements.empty())
-    return std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0};
-  std::vector<double> result(5, 0.0);
-  result.push_back(*std::min_element(measurements.begin(), measurements.end()));
-  result.push_back(*std::max_element(measurements.begin(), measurements.end()));
-  result.push_back(stats::average(measurements));
-  result.push_back(stats::median(measurements));
-  result.push_back(stats::jitter(measurements));
-  return result;
+  if (measurements.empty()) {
+    return std::vector<double>(kNumLatencyStats, 0.0);
+  }
+  return {
+    *std::min_element(measurements.begin(), measurements.end()),
+    *std::max_element(measurements.begin(), measurements.end()),
+    stats::average(measurements),
+    stats::median(measurements),
+    stats::jitter(measurements)
+  };
 }
 
-std::vector<double> measure_download(int bytes, int iterations) {
-  std::vector<double> results = {0.0};
-  results.reserve(iterations);
-  for (int i = 0; i < iterations; ++i) {
-    auto start = std::chrono::high_resolution_clock::now();
-    std::string resp = http_get("speed.cloudflare.com",
-                                "/__down?bytes=" + std::to_string(bytes));
-    auto end = std::chrono::high_resolution_clock::now();
-    if (!resp.empty()) {
-      double ms =
-          std::chrono::duration<double, std::milli>(end - start).count();
-      results.push_back(measure_speed(bytes, ms));
+auto measure_download(int num_bytes, int num_iterations) -> std::vector<double> {
+  std::vector<double> download_results;
+  download_results.reserve(num_iterations);
+  for (int iteration = 0; iteration < num_iterations; ++iteration) {
+    const auto start_time = std::chrono::high_resolution_clock::now();
+    const std::string response = http_get("speed.cloudflare.com",
+                                "/__down?bytes=" + std::to_string(num_bytes));
+    const auto end_time = std::chrono::high_resolution_clock::now();
+    if (!response.empty()) {
+      const double milliseconds =
+          std::chrono::duration<double, std::milli>(end_time - start_time).count();
+      download_results.push_back(measure_speed(num_bytes, milliseconds));
     }
   }
-  return results;
+  return download_results;
 }
 
-std::vector<double> measure_upload(int bytes, int iterations) {
-  std::vector<double> results = {0.0};
-  results.reserve(iterations);
-  std::string data(bytes, '0');
-  for (int i = 0; i < iterations; ++i) {
-    auto start = std::chrono::high_resolution_clock::now();
-    std::string resp = http_post("speed.cloudflare.com", "/__up", data);
-    auto end = std::chrono::high_resolution_clock::now();
-    double ms = std::chrono::duration<double, std::milli>(end - start).count();
-    results.push_back(measure_speed(bytes, ms));
+auto measure_upload(int num_bytes, int num_iterations) -> std::vector<double> {
+  std::vector<double> upload_results;
+  upload_results.reserve(num_iterations);
+  const std::string upload_data(num_bytes, '0');
+  for (int iteration = 0; iteration < num_iterations; ++iteration) {
+    const auto start_time = std::chrono::high_resolution_clock::now();
+    const std::string response = http_post("speed.cloudflare.com", "/__up", upload_data);
+    const auto end_time = std::chrono::high_resolution_clock::now();
+    const double milliseconds = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+    upload_results.push_back(measure_speed(num_bytes, milliseconds));
   }
-  return results;
+  return upload_results;
 }
 
-double measure_speed(int bytes, double duration_ms) {
-  return (bytes * kBitsPerByte) / (duration_ms / kMsPerSecond) / kMbpsDivisor;
+auto measure_speed(int num_bytes, double duration_ms) -> double {
+  return (num_bytes * kBitsPerByte) / (duration_ms / kMsPerSecond) / kMbpsDivisor;
 }
 
 std::vector<double> measure_download_parallel(int bytes, int iterations) {

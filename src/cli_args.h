@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+// Modernized: trailing return types, descriptive parameter names
 struct CliArgs {
   bool use_parallel = false;
   bool minimize_output = false;
@@ -21,4 +22,4 @@ struct CliArgs {
   std::vector<std::string> summary_files;
 };
 
-CliArgs parse_cli_args(const std::vector<std::string>& args);
+auto parse_cli_args(const std::vector<std::string>& arguments) -> CliArgs;

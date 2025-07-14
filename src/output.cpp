@@ -14,7 +14,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <math.h>
+#include <cmath>
 #include <yyjson.h>
 
 constexpr int kFieldWidthFile = 20;
@@ -35,57 +35,64 @@ constexpr int kHexDumpPreviewLen = 64;
 constexpr int kHexDumpLastLen = 64;
 constexpr int kAsciiDelete = 127;
 
-std::string fmt(double v) {
+// Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one declaration per statement, no implicit conversions
+
+auto fmt(double value) -> std::string {
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(2) << v;
+  oss << std::fixed << std::setprecision(2) << value;
   return oss.str();
 }
 
-void log_info(const std::string &text, const std::string &data,
+void log_info(const std::string &label, const std::string &data,
               bool output_json) {
-  if (output_json)
+  if (output_json) {
     return;
-  std::cout << chalk::bold(std::string(kLogInfoPad - text.length(), ' ') + text + ": " +
+  }
+  std::cout << chalk::bold(std::string(kLogInfoPad - label.length(), ' ') + label + ": " +
                            chalk::blue(data))
             << std::endl;
 }
 
-void log_latency(const std::vector<double> &data, bool output_json) {
-  if (output_json)
+void log_latency(const std::vector<double> &latency_data, bool output_json) {
+  if (output_json) {
     return;
+  }
   std::cout << chalk::bold("     Latency: " +
-                           chalk::magenta(fmt(data[2]) + " ms"))
+                           chalk::magenta(fmt(latency_data[2]) + " ms"))
             << std::endl;
   std::cout << chalk::bold("     Jitter:  " +
-                           chalk::magenta(fmt(data[4]) + " ms"))
+                           chalk::magenta(fmt(latency_data[4]) + " ms"))
             << std::endl;
 }
 
-void log_speed_test_result(const std::string &size,
-                           const std::vector<double> &test, bool output_json) {
-  if (output_json)
+void log_speed_test_result(const std::string &size_label,
+                           const std::vector<double> &test_results, bool output_json) {
+  if (output_json) {
     return;
-  double speed = test.empty() ? NAN : stats::median(test);
-  std::cout << chalk::bold(std::string(kLogSpeedPad - size.length(), ' ') + size +
+  }
+  const double speed = test_results.empty() ? NAN : stats::median(test_results);
+  std::cout << chalk::bold(std::string(kLogSpeedPad - size_label.length(), ' ') + size_label +
                            " speed: " + chalk::yellow(fmt(speed) + " Mbps"))
             << std::endl;
 }
 
-void log_download_speed(const std::vector<double> &tests, bool output_json) {
-  if (output_json)
+void log_download_speed(const std::vector<double> &download_tests, bool output_json) {
+  if (output_json) {
     return;
+  }
   std::cout << chalk::bold(
                    "  Download speed: " +
-                   chalk::green(fmt(stats::quartile(tests, kPercentile90)) + " Mbps"))
+                   chalk::green(fmt(stats::quartile(download_tests, kPercentile90)) + " Mbps"))
             << std::endl;
 }
 
-void log_upload_speed(const std::vector<double> &tests, bool output_json) {
-  if (output_json)
+void log_upload_speed(const std::vector<double> &upload_tests, bool output_json) {
+  if (output_json) {
     return;
+  }
   std::cout << chalk::bold(
                    "    Upload speed: " +
-                   chalk::green(fmt(stats::quartile(tests, kPercentile90)) + " Mbps"))
+                   chalk::green(fmt(stats::quartile(upload_tests, kPercentile90)) + " Mbps"))
             << std::endl;
 }
 

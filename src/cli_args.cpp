@@ -7,101 +7,101 @@
 #include <string>
 #include <vector>
 
-std::vector<std::string>
-expand_wildcards(const std::vector<std::string> &patterns);
+// Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one declaration per statement, no implicit conversions
 
-CliArgs parse_cli_args(const std::vector<std::string>& args) {
+auto expand_wildcards(const std::vector<std::string> &patterns) -> std::vector<std::string>;
+
+auto parse_cli_args(const std::vector<std::string>& arguments) -> CliArgs {
   CliArgs parsed_args;
-  for (size_t i = 1; i < args.size(); ++i) {
-    const std::string& arg = args[i];
-    if (arg == "--parallel" || arg == "-p") {
+  for (size_t arg_index = 1; arg_index < arguments.size(); ++arg_index) {
+    const std::string& argument = arguments[arg_index];
+    if (argument == "--parallel" || argument == "-p") {
       parsed_args.use_parallel = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--minimize-output" || arg == "-m") {
+    if (argument == "--minimize-output" || argument == "-m") {
       parsed_args.minimize_output = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--no-warmup") {
+    if (argument == "--no-warmup") {
       parsed_args.warmup = false;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--single-core" || arg == "-s") {
+    if (argument == "--single-core" || argument == "-s") {
       parsed_args.pin_single_core = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--no-yield") {
+    if (argument == "--no-yield") {
       parsed_args.do_yield = false;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--no-nice") {
+    if (argument == "--no-nice") {
       parsed_args.do_nice = false;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--drop-caches") {
+    if (argument == "--drop-caches") {
       parsed_args.do_drop_caches = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--mask-sensitive") {
+    if (argument == "--mask-sensitive") {
       parsed_args.mask_sensitive = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--show-sysinfo") {
+    if (argument == "--show-sysinfo") {
       parsed_args.show_sysinfo = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--show-sysinfo-only") {
+    if (argument == "--show-sysinfo-only") {
       parsed_args.show_sysinfo_only = true;
       continue;
     }
-    if (arg == "--json") {
+    if (argument == "--json") {
       parsed_args.output_json = true;
-      parsed_args.used_flags.push_back(arg);
+      parsed_args.used_flags.push_back(argument);
       continue;
     }
-    if (arg == "--summary-table") {
+    if (argument == "--summary-table") {
       parsed_args.summary_table = true;
-      std::vector<std::string> patterns{};
-      for (size_t j = i + 1; j < args.size(); ++j) {
-        patterns.push_back(args[j]);
+      std::vector<std::string> summary_patterns{};
+      for (size_t pattern_index = arg_index + 1; pattern_index < arguments.size(); ++pattern_index) {
+        summary_patterns.push_back(arguments[pattern_index]);
       }
-      parsed_args.summary_files = expand_wildcards(patterns);
+      parsed_args.summary_files = expand_wildcards(summary_patterns);
       parsed_args.summary_files.erase(
           std::remove_if(parsed_args.summary_files.begin(), parsed_args.summary_files.end(),
-                         [](const std::string &f) {
-                           return f.find(SUMMARY_JSON_FILENAME) !=
+                         [](const std::string &filename) {
+                           return filename.find(SUMMARY_JSON_FILENAME) !=
                                   std::string::npos;
                          }),
           parsed_args.summary_files.end());
       break;
     }
-    if (arg == "--debug") {
+    if (argument == "--debug") {
       parsed_args.debug_mode = true;
       continue;
     }
-    if (arg == "--diagnostics") {
+    if (argument == "--diagnostics") {
       parsed_args.diagnostics_mode = true;
       continue;
     }
-    if (arg == "--help" || arg == "-h") {
+    if (argument == "--help" || argument == "-h") {
       continue;
     }
-    std::cerr << "[WARN] Unknown flag: " << arg << std::endl;
+    std::cerr << "[WARN] Unknown flag: " << argument << std::endl;
   }
   return parsed_args;
 }
 
-std::vector<std::string>
-expand_wildcards(const std::vector<std::string> &patterns) {
+auto expand_wildcards(const std::vector<std::string> &patterns) -> std::vector<std::string> {
   std::vector<std::string> files{};
   for (const auto &pat : patterns) {
     // If no wildcard, just add
