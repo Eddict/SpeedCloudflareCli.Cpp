@@ -8,14 +8,27 @@ BIN=./SpeedCloudflareCli
 OUTDIR=results
 mkdir -p "$OUTDIR"
 
-# Parse extra flags for summary table (e.g., --debug, --diagnostics)
+# Parse extra flags for summary table (e.g., -v, -vv, -vvv, --verbose=N)
 SUMMARY_FLAGS=""
 USE_PERF=0
 USE_GPROF=0
+VERBOSE_LEVEL=0
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --debug|--diagnostics)
-      SUMMARY_FLAGS+=" $1"
+    -vvv)
+      VERBOSE_LEVEL=3
+      shift
+      ;;
+    -vv)
+      VERBOSE_LEVEL=2
+      shift
+      ;;
+    -v|--verbose)
+      VERBOSE_LEVEL=1
+      shift
+      ;;
+    --verbose=*)
+      VERBOSE_LEVEL="${1#--verbose=}"
       shift
       ;;
     --perf)
@@ -32,8 +45,22 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ $VERBOSE_LEVEL -gt 0 ]]; then
+  SUMMARY_FLAGS+=" --verbose=$VERBOSE_LEVEL"
+fi
+
 # Remove old JSON files before running tests
 rm -f "$OUTDIR"/*.json
+
+GPROF_SUMMARY_FILE="$OUTDIR/gprof_summary.txt"
+if [[ $USE_GPROF -eq 1 ]]; then
+  # Remove old profiling files before running tests
+  rm -f "$OUTDIR"/*.gmon.out
+  # Remove old gprof files before running tests
+  rm -f "$OUTDIR"/*.analysis.txt
+  # Remove summary file
+  rm -f "$GPROF_SUMMARY_FILE"
+fi
 
 # Run show-sysinfo-only (not a test)
 SYSINFO_LABEL="show-sysinfo-only"
@@ -56,8 +83,11 @@ declare -a TESTS=(
   "'--parallel --drop-caches' 'par+dropcache'"
 )
 
+PERF_SUMMARY_FILE="$OUTDIR/perf_summary.txt"
 # Check if perf is available if --perf is requested
 if [[ $USE_PERF -eq 1 ]]; then
+  # Remove summary file
+  rm -f "$PERF_SUMMARY_FILE"
   if ! command -v perf >/dev/null 2>&1; then
     echo "[ERROR] 'perf' not found. Please install perf to enable perf analysis. Skipping perf analysis."
     USE_PERF=0
@@ -104,8 +134,6 @@ fi
 
 # If perf was enabled, run perf report for each scenario, combine summaries
 if [[ $USE_PERF -eq 1 ]]; then
-  PERF_SUMMARY_FILE="$OUTDIR/perf_summary.txt"
-  rm -f "$PERF_SUMMARY_FILE"
   for f in $OUTDIR/*.perf.data; do
     txt="${f%.perf.data}.perf.txt"
     label=$(basename "${f%.perf.data}")
@@ -143,7 +171,6 @@ fi
 
 # If gprof was enabled, run gprof for each scenario, combine summaries
 if [[ $USE_GPROF -eq 1 ]]; then
-  GPROF_SUMMARY_FILE="$OUTDIR/gprof_summary.txt"
   rm -f "$GPROF_SUMMARY_FILE"
   for f in $OUTDIR/*.gmon.out; do
     label=$(basename "${f%.gmon.out}")

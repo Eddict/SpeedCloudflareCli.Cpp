@@ -9,6 +9,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Centralized user source directory for all user code
 set(USER_SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 
+# Option to enable gprof profiling instrumentation
+option(ENABLE_GPROF "Enable gprof profiling instrumentation" OFF)
+if(ENABLE_GPROF)
+    message(STATUS "gprof instrumentation enabled: adding -pg to compile and link flags")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+endif()
+
 # Note: All static analysis and formatting is controlled by .clang-tidy and .clang-format in the project root.
 # Do not add per-target or per-directory clang-tidy/format config elsewhere.
 
@@ -88,6 +97,47 @@ if(NOT CMAKE_CROSSCOMPILING)
     if(CLANG_TIDY_EXE)
         set_target_properties(SpeedCloudflareCli PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
     endif()
+endif()
+
+# === Embed JSON schemas as C++ raw string headers ===
+macro(embed_json_raw INPUT OUTPUT VAR)
+  execute_process(
+    COMMAND ${CMAKE_COMMAND}
+      -DINPUT=${INPUT}
+      -DOUTPUT=${OUTPUT}
+      -DVAR=${VAR}
+      -P ${CMAKE_SOURCE_DIR}/cmake/embed_json_as_raw_string.cmake
+  )
+endmacro()
+
+embed_json_raw(
+  "${CMAKE_SOURCE_DIR}/schemas/result.schema.json"
+  "${CMAKE_BINARY_DIR}/embedded_result_schema.h"
+  embedded_result_schema
+)
+embed_json_raw(
+  "${CMAKE_SOURCE_DIR}/schemas/summary.schema.json"
+  "${CMAKE_BINARY_DIR}/embedded_summary_schema.h"
+  embedded_summary_schema
+)
+
+include_directories("${CMAKE_BINARY_DIR}")
+
+# IWYU integration: add custom target using mapping file (fixed: use SRC_FILES for sources)
+file(GLOB SRC_FILES "${USER_SRC_DIR}/*.cpp")
+find_program(IWYU_EXE NAMES include-what-you-use)
+if(IWYU_EXE)
+    add_custom_target(
+        iwyu
+        COMMAND python3 /usr/local/bin/iwyu_tool.py
+            -p ${CMAKE_BINARY_DIR}
+            ${SRC_FILES}
+            -- -I/usr/lib/gcc/x86_64-linux-gnu/12/include
+            # -- --mapping_file=${CMAKE_SOURCE_DIR}/iwyu_mappings.imp
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Running include-what-you-use with mapping file for all user sources"
+        VERBATIM
+    )
 endif()
 
 # End of CMakeLists.txt

@@ -1,0 +1,6 @@
+// IWYU mapping file for SpeedCloudflareCli
+// Suppress removal of <fstream> when using std::ifstream or std::ofstream
+{
+  add_include("<fstream>", "std::ifstream");
+  add_include("<fstream>", "std::ofstream");
+}

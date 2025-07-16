@@ -1,13 +1,13 @@
 ---
 Checks: >
-  bugprone-*,performance-*,clang-analyzer-*,portability-*,modernize-use-nullptr
-  ,-readability-*, -cppcoreguidelines-*, -misc-non-private-member-variables-in-classes
+  bugprone-*, performance-*, clang-analyzer-*, portability-*, modernize-use-nullptr
+  , -readability-*, -cppcoreguidelines-*, -misc-non-private-member-variables-in-classes
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*'
-AnalyzeTemporaryDtors: false
-FormatStyle:     file
+FormatStyle: file
 CheckOptions:
   - key: performance-unnecessary-value-param.AllowedTypes
     value: 'std::string'
   - key: performance-for-range-copy.AllowedTypes
     value: 'std::string'
+...

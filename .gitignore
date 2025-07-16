@@ -8,7 +8,7 @@
 /.vs
 /.vscode
 /out
-/results
+/results*
 /build*
 /SpeedCloudflareCli
 .keep

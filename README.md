@@ -30,14 +30,15 @@ A minimal, flexible, and low-overhead command-line tool for benchmarking Cloudfl
 | `--no-yield`            |       | Do not yield (sleep) between test iterations (default: yield on)            |
 | `--no-nice`             |       | Do not lower process priority (default: nice on)                            |
 | `--drop-caches`         |       | Drop Linux FS caches before test (default: off, root only)                  |
-| `--mask-sensitive`       |       | Mask the last part of your IP address and hostname in output (default: off)         |
+| `--mask-sensitive`      |       | Mask the last part of your IP address and hostname in output (default: off) |
 | `--show-flags-used`     |       | Print a line at the end with all explicitly set flags (default: off)        |
 | `--show-sysinfo`        |       | Show basic host architecture, CPU, and memory info (default: off)           |
-| `--show-sysinfo-only`   |       | Only print system info and exit (supports --mask-sensitive)                  |
-| `--json`                 |       | Output results as JSON to stdout (default: off)                           |
-| `--summary-table FILES`  |       | Print a summary table comparing multiple JSON result files                |
-| `--debug`               |       | Show debug output (default: off)                                         |
-| `--help`                | `-h`  | Show help message and exit                                               |
+| `--show-sysinfo-only`   |       | Only print system info and exit (supports --mask-sensitive)                 |
+| `--json`                |       | Output results as JSON to stdout (default: off)                             |
+| `--summary-table FILES` |       | Print a summary table comparing multiple JSON result files                   |
+| `-v`, `-vv`, `-vvv`     |       | Increase verbosity: -v (debug), -vv (diagnostics), -vvv (full diagnostics)  |
+| `--verbose[=N]`         |       | Set verbosity level (1=debug, 2=diagnostics, 3=full diagnostics)            |
+| `--help`                | `-h`  | Show help message and exit                                                  |
 
 ### Default Behavior
 - Runs sequential download/upload tests
@@ -54,7 +55,15 @@ Run a parallel test with minimal output, pinning to a single core:
 ```
 Run with debug output enabled:
 ```
-./SpeedCloudflareCli --debug --summary-table results/*.json
+./SpeedCloudflareCli -v --summary-table results/*.json
+```
+Run with diagnostics:
+```
+./SpeedCloudflareCli -vv --summary-table results/*.json
+```
+Run with full diagnostics:
+```
+./SpeedCloudflareCli -vvv --summary-table results/*.json
 ```
 
 ## Build Instructions
