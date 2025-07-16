@@ -13,24 +13,24 @@
 auto my_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) -> size_t
 {
   const size_t total_size = size * nmemb;
-  auto* string_ptr = static_cast<std::string*>(userp);
-  string_ptr->append(static_cast<char*>(contents), total_size);
+  auto* vec_ptr = static_cast<std::vector<char>*>(userp);
+  vec_ptr->insert(vec_ptr->end(), static_cast<char*>(contents), static_cast<char*>(contents) + total_size);
   return total_size;
 }
 
 auto http_get(const std::string& hostname, const std::string& path, size_t expected_size = 0) -> std::string
 {
   CURL* curl = curl_easy_init();
-  std::string response;
+  std::vector<char> response_vec;
   if (expected_size > 0) {
-    response.reserve(expected_size);
+    response_vec.reserve(expected_size);
   }
   if (curl != nullptr)
   {
     const std::string url = "https://" + hostname + path;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_vec);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     const CURLcode result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
@@ -39,7 +39,7 @@ auto http_get(const std::string& hostname, const std::string& path, size_t expec
       return "";
     }
   }
-  return response;
+  return std::string(response_vec.begin(), response_vec.end());
 }
 
 auto http_get(const HttpRequest& req, size_t expected_size = 0) -> std::string {
@@ -49,9 +49,9 @@ auto http_get(const HttpRequest& req, size_t expected_size = 0) -> std::string {
 auto http_post(const HttpRequest& req, const std::string& data, size_t expected_size = 0) -> std::string
 {
   CURL* curl = curl_easy_init();
-  std::string response;
+  std::vector<char> response_vec;
   if (expected_size > 0) {
-    response.reserve(expected_size);
+    response_vec.reserve(expected_size);
   }
   if (curl != nullptr)
   {
@@ -61,7 +61,7 @@ auto http_post(const HttpRequest& req, const std::string& data, size_t expected_
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, data.size());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response_vec);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     const CURLcode result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
@@ -70,7 +70,7 @@ auto http_post(const HttpRequest& req, const std::string& data, size_t expected_
       return "";
     }
   }
-  return response;
+  return std::string(response_vec.begin(), response_vec.end());
 }
 
 auto parse_locations_json(const std::string& json)
