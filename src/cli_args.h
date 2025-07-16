@@ -17,8 +17,10 @@ struct CliArgs
   bool show_sysinfo = false;
   bool show_sysinfo_only = false;
   bool summary_table = false;
-  bool debug_mode = false;
-  bool diagnostics_mode = false;
+  bool is_debug = false;
+  bool is_diagnostics = false;
+  bool is_full_diagnostics = false;
+  int verbose_level = 0;
   std::vector<std::string> used_flags;
   std::vector<std::string> summary_files;
 };

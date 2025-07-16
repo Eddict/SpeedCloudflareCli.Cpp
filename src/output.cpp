@@ -1,20 +1,34 @@
 #include "output.h"
-#include "chalk.h"
-#include "json_helpers.h"
-#include "stats.h"
-#include "types.h"
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <memory>
-#include <regex>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <yyjson.h>
+#include <yyjson.h>        // for yyjson_mut_doc_free, yyjson_mut_obj, yyjson_mut_arr, etc.
+#include <algorithm>       // for max, min
+#include <cmath>           // for NAN
+#include <cstdlib>         // for free, size_t
+#include <fstream>         // IWYU pragma: keep  // for ifstream
+#include <iomanip>         // for operator<<, setw, setfill, setprecision
+#include <iostream>        // for operator<<, basic_ostream, endl, ostream
+#include <iterator>        // for istreambuf_iterator, operator!=
+#include <memory>          // for allocator_traits<>::value_type, unique_ptr
+#include <regex>           // for regex_search, match_results<>::_Unchecked
+#include <string>          // for string, operator<<, basic_string, char_traits
+#include <vector>          // for vector
+#include "chalk.h"         // for bold, green, magenta, blue, yellow
+#include "json_helpers.h"  // for add_num, add_str, is_valid_utf8
+#include "stats.h"         // for quartile, median
+#include "types.h"         // for SummaryResult
+
+// Helper: print human-readable explanation for yyjson error codes
+static void print_yyjson_error_explanation(unsigned int code) {
+  switch (code) {
+    case 1: std::clog << "[DIAG] Error explanation: Invalid parameter." << std::endl; break;
+    case 2: std::clog << "[DIAG] Error explanation: Memory allocation failed." << std::endl; break;
+    case 3: std::clog << "[DIAG] Error explanation: Invalid JSON string." << std::endl; break;
+    case 4: std::clog << "[DIAG] Error explanation: Invalid number format." << std::endl; break;
+    case 5: std::clog << "[DIAG] Error explanation: Invalid UTF-8 encoding in string." << std::endl; break;
+    case 6: std::clog << "[DIAG] Error explanation: Depth limit exceeded." << std::endl; break;
+    case 7: std::clog << "[DIAG] Error explanation: Invalid UTF-8 encoding in string." << std::endl; break;
+    default: std::clog << "[DIAG] Error explanation: Unknown error code." << std::endl; break;
+  }
+}
 
 constexpr int kFieldWidthFile = 20;
 constexpr int kFieldWidthCity = 15;
@@ -147,7 +161,7 @@ void print_summary_table(const std::vector<SummaryResult>& results)
 }
 
 std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& files,
-                                                bool diagnostics_mode, bool debug_mode)
+                                                bool is_diagnostics, bool is_debug)
 {
   std::vector<SummaryResult> results{};
   for (const auto& file : files)
@@ -155,13 +169,13 @@ std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& 
     std::ifstream in(file);
     if (!in)
     {
-      if (debug_mode)
+      if (is_debug)
         std::clog << "[DEBUG] Skipping " << file << ": could not open file" << std::endl;
       continue;
     }
     std::string json((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     size_t file_size = json.size();
-    if (diagnostics_mode)
+    if (is_diagnostics)
     {
       std::clog << "[DIAG] File: " << file << std::endl;
       std::clog << "[DIAG]   Size: " << file_size << " bytes" << std::endl;
@@ -219,14 +233,14 @@ std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& 
     yyjson_doc* doc = yyjson_read(json.c_str(), json.size(), 0);
     if (!doc)
     {
-      if (debug_mode)
+      if (is_debug)
         std::clog << "[DEBUG] Skipping " << file << ": failed to parse JSON" << std::endl;
       continue;
     }
     yyjson_val* root = yyjson_doc_get_root(doc);
     if (!yyjson_is_obj(root))
     {
-      if (debug_mode)
+      if (is_debug)
         std::clog << "[DEBUG] Skipping " << file << ": root is not a JSON object" << std::endl;
       yyjson_doc_free(doc);
       continue;
@@ -247,7 +261,7 @@ std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& 
     r.download = v && yyjson_is_num(v) ? yyjson_get_real(v) : 0.0;
     v = yyjson_obj_get(root, "upload_90pct");
     r.upload = v && yyjson_is_num(v) ? yyjson_get_real(v) : 0.0;
-    if (debug_mode)
+    if (is_debug)
       std::clog << "[DEBUG] Loaded: " << r.file << " | server_city='" << r.server_city << "' ip='"
                 << r.ip << "' latency=" << r.latency << " jitter=" << r.jitter
                 << " download=" << r.download << " upload=" << r.upload << std::endl;
@@ -258,10 +272,10 @@ std::vector<SummaryResult> load_summary_results(const std::vector<std::string>& 
 }
 
 void write_summary_json(const std::vector<SummaryResult>& results, const std::string& filename,
-                        bool diagnostics_mode, bool debug_mode)
+                        bool is_diagnostics, bool is_debug, bool is_full_diagnostics)
 {
-  if (diagnostics_mode)
-  {
+  if (is_full_diagnostics) {
+    // Print full/incremental diagnostics for all entries
     for (size_t n = 1; n <= results.size(); ++n)
     {
       yyjson_mut_doc* test_doc = yyjson_mut_doc_new(nullptr);
@@ -284,7 +298,11 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
           const std::string& value;
         };
         std::vector<FieldCheck> fields = {
-            {"file", entry.file}, {"server_city", entry.server_city}, {"ip", entry.ip}};
+            {"file", entry.file},
+            {"server_city", entry.server_city},
+            {"ip", entry.ip}
+        };
+        // Check all string fields for UTF-8 validity and print hex/text
         for (const auto& f : fields)
         {
           bool valid = is_valid_utf8(f.value);
@@ -295,8 +313,12 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
                     << std::endl;
           std::clog << "[DIAG]   Value (hex): ";
           for (unsigned char c : f.value)
-            std::clog << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << c;
+            std::clog << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (int)c << " ";
           std::clog << std::dec << std::endl;
+          std::clog << "[DIAG]   Value (text): ";
+          for (unsigned char c : f.value)
+            std::clog << (c >= 32 && c <= 126 ? (char)c : '.');
+          std::clog << std::endl;
         }
         std::clog << "[DIAG] Entry " << i << ", label (used in output): '" << label.c_str()
                   << "', ptr: " << (const void*)label.c_str() << ", len: " << label.size()
@@ -322,7 +344,11 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
         add_num(test_doc, test_obj, "download", entry.download);
         add_num(test_doc, test_obj, "upload", entry.upload);
         int arr_add_ret = yyjson_mut_arr_add_val(test_arr, test_obj);
-        std::clog << "[DIAG] yyjson_mut_arr_add_val[" << i << "] ret: " << arr_add_ret << std::endl;
+        std::clog << "[DIAG] Added test_obj[" << i << "] ptr: " << (void*)test_obj
+                  << " to test_arr ptr: " << (void*)test_arr
+                  << ", arr_add_ret: " << arr_add_ret << std::endl;
+        // Explicit parent-child relationship
+        std::clog << "[DIAG] Parent-child: test_arr (" << (void*)test_arr << ") <- test_obj[" << i << "] (" << (void*)test_obj << ")" << std::endl;
       }
       if (ok)
       {
@@ -338,19 +364,166 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
         {
           std::clog << "[DIAG] Serialization failed at n=" << n << " (label='"
                     << results[n - 1].file.c_str()
-                    << "'): yyjson "
-                       "error: "
-                    << err.msg << " (code " << err.code << ")" << std::endl;
-          char* arr_json = yyjson_mut_val_write(test_arr, 0, nullptr);
-          std::unique_ptr<char, decltype(&free)> arr_json_ptr(arr_json, &free);
-          if (arr_json_ptr)
+                    << "'): yyjson error: " << err.msg << " (code " << err.code << ")" << std::endl;
+          print_yyjson_error_explanation(err.code);
+          // Print all object pointers and their parent relationships
+          std::clog << "[DIAG] Dumping all object pointers, field values, and parent relationships for this run:" << std::endl;
+          for (size_t j = 0; j < obj_ptrs.size(); ++j) {
+            std::clog << "[DIAG]   obj_ptrs[" << j << "]: " << obj_ptrs[j] << std::endl;
+            const auto& entry = results[j];
+            std::clog << "[DIAG]     file: " << entry.file << std::endl;
+            std::clog << "[DIAG]     server_city: " << entry.server_city << std::endl;
+            std::clog << "[DIAG]     ip: " << entry.ip << std::endl;
+            std::clog << "[DIAG]     latency: " << entry.latency << std::endl;
+            std::clog << "[DIAG]     jitter: " << entry.jitter << std::endl;
+            std::clog << "[DIAG]     download: " << entry.download << std::endl;
+            std::clog << "[DIAG]     upload: " << entry.upload << std::endl;
+            // Print parent (test_arr) pointer for each object
+            std::clog << "[DIAG]     parent array ptr: " << (void*)test_arr << std::endl;
+          }
+          yyjson_mut_doc* single_doc = yyjson_mut_doc_new(nullptr);
+          yyjson_mut_val* single_obj = yyjson_mut_obj(single_doc);
+          std::clog << "[DIAG] single_doc ptr: " << (void*)single_doc
+                    << ", single_obj ptr: " << (void*)single_obj << std::endl;
+          std::string label = results[n - 1].file;
+          std::smatch m;
+          if (std::regex_search(results[n - 1].file, m, label_re) && m.size() > 1)
+            label = m[1].str();
+          auto safe = [](const std::string& s) -> const char*
+          { return s.empty() ? "" : s.c_str(); };
+          add_str(single_doc, single_obj, "label", label);
+          add_str(single_doc, single_obj, "server_city", results[n - 1].server_city);
+          add_str(single_doc, single_obj, "ip", results[n - 1].ip);
+          add_num(single_doc, single_obj, "latency", results[n - 1].latency);
+          add_num(single_doc, single_obj, "jitter", results[n - 1].jitter);
+          add_num(single_doc, single_obj, "download", results[n - 1].download);
+          add_num(single_doc, single_obj, "upload", results[n - 1].upload);
+          yyjson_mut_doc_set_root(single_doc, single_obj);
+          char* single_json = yyjson_mut_write(single_doc, 0, nullptr);
+          std::unique_ptr<char, decltype(&free)> single_json_ptr(single_json, &free);
+          if (single_json_ptr)
           {
-            std::clog << "[DIAG] Direct array serialization at n=" << n
-                      << " succeeded: " << arr_json_ptr.get() << std::endl;
+            std::clog << "[DIAG] Problematic entry JSON: " << single_json_ptr.get() << std::endl;
           }
           else
           {
-            std::clog << "[DIAG] Direct array serialization at n=" << n << " FAILED!" << std::endl;
+            std::clog << "[DIAG] Problematic entry could not be serialized individually!"
+                      << std::endl;
+          }
+          yyjson_mut_doc_free(single_doc);
+          yyjson_mut_doc_free(test_doc);
+          std::clog << "[DIAG] Created " << obj_ptrs.size() << " objects in this run" << std::endl;
+          break;
+        }
+        else
+        {
+          // Serialization succeeded
+        }
+      }
+      yyjson_mut_doc_free(test_doc);
+    }
+  } else if (is_diagnostics) {
+    // Only print diagnostics for the failing entry (if any)
+    for (size_t n = 1; n <= results.size(); ++n)
+    {
+      yyjson_mut_doc* test_doc = yyjson_mut_doc_new(nullptr);
+      std::clog << "[DIAG] test_doc ptr: " << (void*)test_doc << std::endl;
+      yyjson_mut_val* test_arr = yyjson_mut_arr(test_doc);
+      std::clog << "[DIAG] test_arr ptr: " << (void*)test_arr << std::endl;
+      std::regex label_re(R"(^(.*)\\.json$)");
+      bool ok = true;
+      std::vector<void*> obj_ptrs;
+      for (size_t i = 0; i < n; ++i)
+      {
+        const auto& entry = results[i];
+        std::string label = entry.file;
+        std::smatch m;
+        if (std::regex_search(entry.file, m, label_re) && m.size() > 1)
+          label = m[1].str();
+        struct FieldCheck
+        {
+          const char* name;
+          const std::string& value;
+        };
+        std::vector<FieldCheck> fields = {
+            {"file", entry.file},
+            {"server_city", entry.server_city},
+            {"ip", entry.ip}
+        };
+        // Check all string fields for UTF-8 validity and print hex/text
+        for (const auto& f : fields)
+        {
+          bool valid = is_valid_utf8(f.value);
+          std::clog << "[DIAG] Entry " << i << ", field '" << f.name
+                    << "' (file: " << entry.file.c_str()
+                    << "): " << (valid ? "valid UTF-8" : "INVALID UTF-8")
+                    << ", ptr: " << (const void*)f.value.c_str() << ", len: " << f.value.size()
+                    << std::endl;
+          std::clog << "[DIAG]   Value (hex): ";
+          for (unsigned char c : f.value)
+            std::clog << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << (int)c << " ";
+          std::clog << std::dec << std::endl;
+          std::clog << "[DIAG]   Value (text): ";
+          for (unsigned char c : f.value)
+            std::clog << (c >= 32 && c <= 126 ? (char)c : '.');
+          std::clog << std::endl;
+        }
+        std::clog << "[DIAG] Entry " << i << ", label (used in output): '" << label.c_str()
+                  << "', ptr: " << (const void*)label.c_str() << ", len: " << label.size()
+                  << std::endl;
+        std::clog << "[DIAG]   Label (hex): ";
+        for (unsigned char c : label)
+          std::clog << std::hex << std::uppercase << std::setw(2) << std::setfill('0') << c;
+        std::clog << std::dec << std::endl;
+        yyjson_mut_val* test_obj = yyjson_mut_obj(test_doc);
+        std::clog << "[DIAG] test_obj[" << i << "] ptr: " << (void*)test_obj << std::endl;
+        obj_ptrs.push_back((void*)test_obj);
+        if (!test_obj)
+        {
+          ok = false;
+          break;
+        }
+        auto safe = [](const std::string& s) -> const char* { return s.empty() ? "" : s.c_str(); };
+        add_str(test_doc, test_obj, "label", label);
+        add_str(test_doc, test_obj, "server_city", entry.server_city);
+        add_str(test_doc, test_obj, "ip", entry.ip);
+        add_num(test_doc, test_obj, "latency", entry.latency);
+        add_num(test_doc, test_obj, "jitter", entry.jitter);
+        add_num(test_doc, test_obj, "download", entry.download);
+        add_num(test_doc, test_obj, "upload", entry.upload);
+        int arr_add_ret = yyjson_mut_arr_add_val(test_arr, test_obj);
+        std::clog << "[DIAG] Added test_obj[" << i << "] ptr: " << (void*)test_obj << " to test_arr ptr: " << (void*)test_arr << ", arr_add_ret: " << arr_add_ret << std::endl;
+      }
+      if (ok)
+      {
+        yyjson_mut_val* test_root = yyjson_mut_obj(test_doc);
+        std::clog << "[DIAG] test_root ptr: " << (void*)test_root << std::endl;
+        int obj_add_ret = yyjson_mut_obj_add_val(test_doc, test_root, "results", test_arr);
+        std::clog << "[DIAG] yyjson_mut_obj_add_val (results) ret: " << obj_add_ret << std::endl;
+        yyjson_mut_doc_set_root(test_doc, test_root);
+        yyjson_write_err err;
+        char* test_out = yyjson_mut_write_opts(test_doc, 0, nullptr, nullptr, &err);
+        std::unique_ptr<char, decltype(&free)> test_out_ptr(test_out, &free);
+        if (!test_out_ptr)
+        {
+          std::clog << "[DIAG] Serialization failed at n=" << n << " (label='"
+                    << results[n - 1].file.c_str()
+                    << "'): yyjson error: " << err.msg << " (code " << err.code << ")" << std::endl;
+          print_yyjson_error_explanation(err.code);
+          // Print all object pointers and their parent relationships
+          std::clog << "[DIAG] Dumping all object pointers, field values, and parent relationships for this run:" << std::endl;
+          for (size_t j = 0; j < obj_ptrs.size(); ++j) {
+            std::clog << "[DIAG]   obj_ptrs[" << j << "]: " << obj_ptrs[j] << std::endl;
+            const auto& entry = results[j];
+            std::clog << "[DIAG]     file: " << entry.file << std::endl;
+            std::clog << "[DIAG]     server_city: " << entry.server_city << std::endl;
+            std::clog << "[DIAG]     ip: " << entry.ip << std::endl;
+            std::clog << "[DIAG]     latency: " << entry.latency << std::endl;
+            std::clog << "[DIAG]     jitter: " << entry.jitter << std::endl;
+            std::clog << "[DIAG]     download: " << entry.download << std::endl;
+            std::clog << "[DIAG]     upload: " << entry.upload << std::endl;
+            // Print parent (test_arr) pointer for each object
+            std::clog << "[DIAG]     parent array ptr: " << (void*)test_arr << std::endl;
           }
           yyjson_mut_doc* single_doc = yyjson_mut_doc_new(nullptr);
           yyjson_mut_val* single_obj = yyjson_mut_obj(single_doc);
@@ -398,14 +571,14 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
   yyjson_mut_doc* doc = yyjson_mut_doc_new(nullptr);
   if (!doc)
   {
-    if (diagnostics_mode || debug_mode)
+    if (is_diagnostics || is_debug)
       std::cerr << "[ERROR] Failed to create yyjson_mut_doc!" << std::endl;
     return;
   }
   yyjson_mut_val* arr = yyjson_mut_arr(doc);
   if (!arr)
   {
-    if (diagnostics_mode || debug_mode)
+    if (is_diagnostics || is_debug)
       std::cerr << "[ERROR] Failed to create yyjson_mut_arr!" << std::endl;
     yyjson_mut_doc_free(doc);
     return;
@@ -416,7 +589,7 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
     yyjson_mut_val* obj = yyjson_mut_obj(doc);
     if (!obj)
     {
-      if (diagnostics_mode || debug_mode)
+      if (is_diagnostics || is_debug)
         std::cerr << "[ERROR] Failed to create yyjson_mut_obj!" << std::endl;
       continue;
     }
@@ -440,7 +613,7 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
   std::unique_ptr<char, decltype(&free)> out_cstr_ptr(out_cstr, &free);
   if (!out_cstr_ptr)
   {
-    if (diagnostics_mode || debug_mode)
+    if (is_diagnostics || is_debug)
       std::cerr << "[ERROR] Failed to serialize JSON: yyjson_mut_write returned nullptr!"
                 << std::endl;
     yyjson_mut_doc_free(doc);
@@ -450,7 +623,7 @@ void write_summary_json(const std::vector<SummaryResult>& results, const std::st
   std::ofstream f(filename);
   if (!f)
   {
-    if (diagnostics_mode || debug_mode)
+    if (is_diagnostics || is_debug)
       std::cerr << "[ERROR] Could not open " << filename << " for writing!" << std::endl;
     return;
   }

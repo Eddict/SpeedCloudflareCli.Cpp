@@ -1,22 +1,19 @@
 #include "benchmarks.h"
-#include "network.h"
-#include "output.h"
-#include "stats.h"
-#include "sysinfo.h"
-#include "types.h"
-#include <algorithm>
-#include <chrono>
-#include <cmath>
-#include <fstream>
-#include <future>
-#include <iomanip>
-#include <iostream>
-#include <map>
-#include <sstream>
-#include <string>
-#include <thread>
-#include <vector>
-#include <yyjson.h>
+#include <bits/chrono.h>  // for operator-, duration, high_resolution_clock
+#include <stddef.h>       // for size_t
+#include <algorithm>      // for max_element, min, min_element
+#include <future>         // for future, async, launch, launch::async
+#include <iostream>       // for operator<<, basic_ostream, basic_ostream<>:...
+#include <map>            // for map, map<>::mapped_type
+#include <ratio>          // for milli
+#include <string>         // for string, allocator, operator+, char_traits
+#include <thread>         // for thread
+#include <vector>         // for vector, vector<>::iterator
+#include "network.h"      // for http_get, HttpRequest, http_post, parse_cdn...
+#include "output.h"       // for log_speed_test_result, log_info, log_downlo...
+#include "stats.h"        // for average, jitter, median
+#include "sysinfo.h"      // for get_time_ms, yield_cpu, collect_sysinfo
+#include "types.h"        // for TestResults
 
 constexpr int kLatencySamples = 20;
 constexpr int kDownload100kB = 101000;
@@ -40,32 +37,17 @@ constexpr double kMsPerSecond = 1000.0;
 constexpr double kMbpsDivisor = 1e6;
 constexpr int kNumLatencyStats = 5;
 
-// Strong typedefs for swappable parameters
-struct DownloadParams
-{
-  int num_bytes;
-  int num_iterations;
-};
+// Refactored measure_download, measure_upload, and measure_download_parallel to use BenchmarkParams
 
-struct UploadParams
-{
-  int num_bytes;
-  int num_iterations;
-};
-
-// Refactored measure_download and measure_upload to use structs
-auto measure_download(const DownloadParams& params) -> std::vector<double>
+auto measure_download(const BenchmarkParams& params) -> std::vector<double>
 {
   std::vector<double> download_results;
   download_results.reserve(params.num_iterations);
-
-  // Build URL once outside the loop for efficiency
   const std::string url = "/__down?bytes=" + std::to_string(params.num_bytes);
-
   for (int i = 0; i < params.num_iterations; ++i)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_get("speed.cloudflare.com", url);
+    const std::string response = http_get(HttpRequest{"speed.cloudflare.com", url});
     const auto end_time = std::chrono::high_resolution_clock::now();
     if (!response.empty())
     {
@@ -77,7 +59,7 @@ auto measure_download(const DownloadParams& params) -> std::vector<double>
   return download_results;
 }
 
-auto measure_upload(const UploadParams& params) -> std::vector<double>
+auto measure_upload(const BenchmarkParams& params) -> std::vector<double>
 {
   std::vector<double> upload_results;
   upload_results.reserve(params.num_iterations);
@@ -85,13 +67,72 @@ auto measure_upload(const UploadParams& params) -> std::vector<double>
   for (int iteration_index = 0; iteration_index < params.num_iterations; ++iteration_index)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_post("speed.cloudflare.com", "/__up", upload_data);
+    const std::string response = http_post(HttpRequest{"speed.cloudflare.com", "/__up"}, upload_data);
     const auto end_time = std::chrono::high_resolution_clock::now();
     const double milliseconds =
         std::chrono::duration<double, std::milli>(end_time - start_time).count();
     upload_results.push_back(measure_speed(params.num_bytes, milliseconds));
   }
   return upload_results;
+}
+
+auto measure_download_parallel(const BenchmarkParams& params) -> std::vector<double>
+{
+  const int max_threads = 2;
+  int num_threads = std::min(max_threads, params.num_iterations);
+  std::vector<std::future<double>> futures;
+  futures.reserve(params.num_iterations);
+  const std::string url = "/__down?bytes=" + std::to_string(params.num_bytes);
+  int launched = 0;
+  std::vector<double> results;
+  results.reserve(params.num_iterations);
+  while (launched < params.num_iterations)
+  {
+    int batch = std::min(num_threads, params.num_iterations - launched);
+    std::vector<std::future<double>> batch_futures;
+    batch_futures.reserve(batch);
+    for (int i = 0; i < batch; ++i)
+    {
+      batch_futures.push_back(std::async(
+          std::launch::async,
+          [&url, &params]()
+          {
+            auto start = std::chrono::high_resolution_clock::now();
+            std::string resp = http_get(HttpRequest{"speed.cloudflare.com", url});
+            auto end = std::chrono::high_resolution_clock::now();
+            if (!resp.empty())
+            {
+              auto milliseconds = std::chrono::duration<double, std::milli>(end - start).count();
+              return measure_speed(params.num_bytes, milliseconds);
+            }
+            return 0.0;
+          }));
+    }
+    for (auto& fut : batch_futures)
+    {
+      results.push_back(fut.get());
+    }
+    launched += batch;
+  }
+  return results;
+}
+
+// Wrapper for legacy interface: measure_download(int, int)
+auto measure_download(int bytes, int iterations) -> std::vector<double>
+{
+  return measure_download(BenchmarkParams{bytes, iterations});
+}
+
+// Wrapper for legacy interface: measure_upload(int bytes, int iterations)
+auto measure_upload(int bytes, int iterations) -> std::vector<double>
+{
+  return measure_upload(BenchmarkParams{bytes, iterations});
+}
+
+// Wrapper for legacy interface: measure_download_parallel(int, int)
+auto measure_download_parallel(int bytes, int iterations) -> std::vector<double>
+{
+  return measure_download_parallel(BenchmarkParams{bytes, iterations});
 }
 
 // Use braced initializer list for vector return
@@ -102,7 +143,7 @@ auto measure_latency() -> std::vector<double>
   for (int sample_index = 0; sample_index < kLatencySamples; ++sample_index)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_get("speed.cloudflare.com", "/__down?bytes=1000");
+    const std::string response = http_get(HttpRequest{"speed.cloudflare.com", "/__down?bytes=1000"});
     const auto end_time = std::chrono::high_resolution_clock::now();
     if (!response.empty())
     {
@@ -125,64 +166,6 @@ auto measure_speed(int num_bytes, double duration_ms) -> double
   return (num_bytes * kBitsPerByte) / (duration_ms / kMsPerSecond) / kMbpsDivisor;
 }
 
-auto measure_download_parallel(int bytes,
-                               int iterations) // NOLINT(bugprone-easily-swappable-parameters)
-    -> std::vector<double>
-{
-  // On low-powered 2-core ARMv7l, limit parallelism to 2 threads max
-  const int max_threads = 2;
-  int num_threads = std::min(max_threads, iterations);
-  std::vector<std::future<double>> futures;
-  futures.reserve(iterations);
-  const std::string url = "/__down?bytes=" + std::to_string(bytes);
-
-  // Launch up to num_threads tasks at a time
-  int launched = 0;
-  std::vector<double> results;
-  results.reserve(iterations);
-  while (launched < iterations)
-  {
-    int batch = std::min(num_threads, iterations - launched);
-    std::vector<std::future<double>> batch_futures;
-    batch_futures.reserve(batch);
-    for (int i = 0; i < batch; ++i)
-    {
-      batch_futures.push_back(std::async(
-          std::launch::async,
-          [&url, bytes]()
-          {
-            auto start = std::chrono::high_resolution_clock::now();
-            std::string resp = http_get("speed.cloudflare.com", url);
-            auto end = std::chrono::high_resolution_clock::now();
-            if (!resp.empty())
-            {
-              auto milliseconds = std::chrono::duration<double, std::milli>(end - start).count();
-              return measure_speed(bytes, milliseconds);
-            }
-            return 0.0;
-          }));
-    }
-    for (auto& fut : batch_futures)
-    {
-      results.push_back(fut.get());
-    }
-    launched += batch;
-  }
-  return results;
-}
-
-// Wrapper for legacy interface: measure_download(int, int)
-auto measure_download(int bytes, int iterations) -> std::vector<double>
-{
-  return measure_download(DownloadParams{bytes, iterations});
-}
-
-// Wrapper for legacy interface: measure_upload(int, int)
-auto measure_upload(int bytes, int iterations) -> std::vector<double>
-{
-  return measure_upload(UploadParams{bytes, iterations});
-}
-
 void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yield,
                 bool mask_sensitive, bool output_json, TestResults* json_results)
 {
@@ -191,7 +174,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
   {
     for (int warmup_index = 0; warmup_index < 3; ++warmup_index)
     {
-      http_get("speed.cloudflare.com", "/__down?bytes=1000");
+      http_get(HttpRequest{"speed.cloudflare.com", "/__down?bytes=1000"});
       if (do_yield)
       {
         yield_cpu();
@@ -200,7 +183,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
   }
   // Fetch server location data
   auto t_loc = get_time_ms();
-  std::string loc_json = http_get("speed.cloudflare.com", "/locations");
+  std::string loc_json = http_get(HttpRequest{"speed.cloudflare.com", "/locations"});
   if (!minimize_output && !output_json)
   {
     std::cout << "[TIME] Fetch locations: " << (get_time_ms() - t_loc) << " ms\n";
@@ -213,7 +196,7 @@ void speed_test(bool use_parallel, bool minimize_output, bool warmup, bool do_yi
   }
   // Fetch CDN trace
   auto t_trace = get_time_ms();
-  std::string trace = http_get("speed.cloudflare.com", "/cdn-cgi/trace");
+  std::string trace = http_get(HttpRequest{"speed.cloudflare.com", "/cdn-cgi/trace"});
   if (!minimize_output && !output_json)
   {
     std::cout << "[TIME] Fetch trace: " << (get_time_ms() - t_trace) << " ms\n";

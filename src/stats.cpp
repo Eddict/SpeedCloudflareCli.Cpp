@@ -1,6 +1,8 @@
 #include "stats.h"
-#include <algorithm>
-#include <cmath>
+#include <bits/std_abs.h>  // for abs
+#include <stddef.h>        // for size_t
+#include <algorithm>       // for sort
+#include <cmath>           // for floor
 
 namespace stats
 {

@@ -1,11 +1,12 @@
 #include "json_helpers.h"
-#include "types.h"
-#include <algorithm>
-#include <cmath>
-#include <functional>
-#include <string>
-#include <vector>
-#include <yyjson.h>
+#include <stddef.h>    // for size_t
+#include <yyjson.h>    // for yyjson_mut_val, yyjson_mut_arr, yyjson_mut_obj...
+#include <algorithm>   // for sort
+#include <cmath>       // for ceil
+#include <functional>  // for function
+#include <string>      // for string, allocator, basic_string
+#include <vector>      // for vector
+#include "types.h"     // for TestResults
 
 constexpr double kPercentile90 = 0.9;
 
@@ -93,8 +94,7 @@ auto percentile(const std::vector<double>& values, double percentile_value) -> d
   }
   std::vector<double> sorted = values;
   std::sort(sorted.begin(), sorted.end());
-  size_t sorted_index = static_cast<size_t>(std::ceil(percentile_value * sorted.size())) - 1;
-  if (sorted_index >= sorted.size())
+  size_t sorted_index = static_cast<size_t>(std::ceil(percentile_value * static_cast<double>(sorted.size()))) - 1;  if (sorted_index >= sorted.size())
   {
     sorted_index = sorted.size() - 1;
   }

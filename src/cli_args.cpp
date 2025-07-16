@@ -6,6 +6,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
 
 // Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one
 // declaration per statement, no implicit conversions
@@ -15,6 +16,7 @@ auto expand_wildcards(const std::vector<std::string>& patterns) -> std::vector<s
 auto parse_cli_args(const std::vector<std::string>& arguments) -> CliArgs
 {
   CliArgs parsed_args;
+  parsed_args.verbose_level = 0;
   for (size_t arg_index = 1; arg_index < arguments.size(); ++arg_index)
   {
     const std::string& argument = arguments[arg_index];
@@ -99,14 +101,26 @@ auto parse_cli_args(const std::vector<std::string>& arguments) -> CliArgs
           parsed_args.summary_files.end());
       break;
     }
-    if (argument == "--debug")
+    // Verbosity: -v, -vv, -vvv, --verbose=N
+    if (argument == "-v" || argument == "--verbose" || argument.rfind("--verbose=", 0) == 0)
     {
-      parsed_args.debug_mode = true;
+      if (argument == "-v" || argument == "--verbose")
+        parsed_args.verbose_level = std::max(parsed_args.verbose_level, 1);
+      else if (argument.rfind("--verbose=", 0) == 0)
+      {
+        int v = std::atoi(argument.c_str() + 10);
+        if (v > 0) parsed_args.verbose_level = std::max(parsed_args.verbose_level, v);
+      }
       continue;
     }
-    if (argument == "--diagnostics")
+    if (argument == "-vv")
     {
-      parsed_args.diagnostics_mode = true;
+      parsed_args.verbose_level = std::max(parsed_args.verbose_level, 2);
+      continue;
+    }
+    if (argument == "-vvv")
+    {
+      parsed_args.verbose_level = std::max(parsed_args.verbose_level, 3);
       continue;
     }
     if (argument == "--help" || argument == "-h")
@@ -115,6 +129,10 @@ auto parse_cli_args(const std::vector<std::string>& arguments) -> CliArgs
     }
     std::cerr << "[WARN] Unknown flag: " << argument << std::endl;
   }
+  // Set debug/diagnostics flags for compatibility
+  parsed_args.is_debug = parsed_args.verbose_level >= 1;
+  parsed_args.is_diagnostics = parsed_args.verbose_level >= 2;
+  parsed_args.is_full_diagnostics = parsed_args.verbose_level >= 3;
   return parsed_args;
 }
 

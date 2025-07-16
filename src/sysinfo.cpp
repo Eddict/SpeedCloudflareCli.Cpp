@@ -1,18 +1,19 @@
 #include "sysinfo.h"
-#include "types.h"
-#include <array>
-#include <chrono>
-#include <ctime>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <sched.h>
-#include <string>
-#include <string_view>
-#include <sys/resource.h>
-#include <sys/utsname.h>
-#include <thread>
-#include <vector>
+#include <bits/chrono.h>           // for milliseconds
+#include <sched.h>                 // for sched_setaffinity, cpu_set_t, CPU_SET
+#include <stdio.h>                 // for fopen, fputs, FILE, fclose
+#include <sys/resource.h>          // for setpriority, PRIO_PROCESS
+#include <sys/utsname.h>           // for utsname, uname
+#include <array>                   // for array
+#include <ctime>                   // for localtime_r, size_t, strftime, time
+#include <fstream>                 // IWYU pragma: keep  // for ifstream
+#include <iomanip>                 // for operator<<, setprecision
+#include <iostream>                // for operator<<, basic_ostream, endl
+#include <memory>                  // for unique_ptr
+#include <string>                  // for string, allocator, char_traits
+#include <string_view>             // for string_view
+#include <thread>                  // for sleep_for
+#include "types.h"                 // for TestResults, BUILD_VERSION
 
 constexpr size_t kDatetimeLen = 64;
 constexpr double kMemGBDiv = 1048576.0;

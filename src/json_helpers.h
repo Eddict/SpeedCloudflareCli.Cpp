@@ -1,8 +1,9 @@
 #pragma once
-#include "types.h"
 #include <string>
 #include <vector>
-#include <yyjson.h>
+#include <yyjson.h>  // for yyjson_mut_doc, yyjson_mut_val
+
+struct TestResults;
 
 // JSON helpers
 // Modernized: trailing return types, descriptive parameter names

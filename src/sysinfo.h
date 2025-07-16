@@ -1,6 +1,7 @@
 #pragma once
-#include "types.h"
-#include <string>
+#include <string>  // for string
+
+struct TestResults;
 
 // System info helpers
 // Modernized: trailing return types, descriptive parameter names

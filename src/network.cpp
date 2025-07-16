@@ -1,5 +1,6 @@
 #include "network.h"
 #include <curl/curl.h>
+#include <stddef.h>
 #include <map>
 #include <sstream>
 #include <string>
@@ -38,15 +39,17 @@ auto http_get(const std::string& hostname, const std::string& path) -> std::stri
   return response;
 }
 
-auto http_post(const std::string& hostname, const std::string& path,
-               const std::string& data) // NOLINT(bugprone-easily-swappable-parameters)
-    -> std::string
+auto http_get(const HttpRequest& req) -> std::string {
+    return http_get(req.hostname, req.path);
+}
+
+auto http_post(const HttpRequest& req, const std::string& data) -> std::string
 {
   CURL* curl = curl_easy_init();
   std::string response;
   if (curl != nullptr)
   {
-    const std::string url = "https://" + hostname + path;
+    const std::string url = "https://" + req.hostname + req.path;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
