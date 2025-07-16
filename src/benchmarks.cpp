@@ -47,7 +47,7 @@ auto measure_download(const BenchmarkParams& params) -> std::vector<double>
   for (int i = 0; i < params.num_iterations; ++i)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_get(HttpRequest{"speed.cloudflare.com", url});
+    const std::string response = http_get(HttpRequest{"speed.cloudflare.com", url}, params.num_bytes);
     const auto end_time = std::chrono::high_resolution_clock::now();
     if (!response.empty())
     {
@@ -67,7 +67,7 @@ auto measure_upload(const BenchmarkParams& params) -> std::vector<double>
   for (int iteration_index = 0; iteration_index < params.num_iterations; ++iteration_index)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_post(HttpRequest{"speed.cloudflare.com", "/__up"}, upload_data);
+    const std::string response = http_post(HttpRequest{"speed.cloudflare.com", "/__up"}, upload_data, params.num_bytes);
     const auto end_time = std::chrono::high_resolution_clock::now();
     const double milliseconds =
         std::chrono::duration<double, std::milli>(end_time - start_time).count();
@@ -98,7 +98,7 @@ auto measure_download_parallel(const BenchmarkParams& params) -> std::vector<dou
           [&url, &params]()
           {
             auto start = std::chrono::high_resolution_clock::now();
-            std::string resp = http_get(HttpRequest{"speed.cloudflare.com", url});
+            std::string resp = http_get(HttpRequest{"speed.cloudflare.com", url}, params.num_bytes);
             auto end = std::chrono::high_resolution_clock::now();
             if (!resp.empty())
             {

@@ -18,10 +18,13 @@ auto my_curl_write_callback(void* contents, size_t size, size_t nmemb, void* use
   return total_size;
 }
 
-auto http_get(const std::string& hostname, const std::string& path) -> std::string
+auto http_get(const std::string& hostname, const std::string& path, size_t expected_size = 0) -> std::string
 {
   CURL* curl = curl_easy_init();
   std::string response;
+  if (expected_size > 0) {
+    response.reserve(expected_size);
+  }
   if (curl != nullptr)
   {
     const std::string url = "https://" + hostname + path;
@@ -39,14 +42,17 @@ auto http_get(const std::string& hostname, const std::string& path) -> std::stri
   return response;
 }
 
-auto http_get(const HttpRequest& req) -> std::string {
-    return http_get(req.hostname, req.path);
+auto http_get(const HttpRequest& req, size_t expected_size = 0) -> std::string {
+    return http_get(req.hostname, req.path, expected_size);
 }
 
-auto http_post(const HttpRequest& req, const std::string& data) -> std::string
+auto http_post(const HttpRequest& req, const std::string& data, size_t expected_size = 0) -> std::string
 {
   CURL* curl = curl_easy_init();
   std::string response;
+  if (expected_size > 0) {
+    response.reserve(expected_size);
+  }
   if (curl != nullptr)
   {
     const std::string url = "https://" + req.hostname + req.path;
