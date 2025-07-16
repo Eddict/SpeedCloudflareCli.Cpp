@@ -103,7 +103,7 @@ for test in "${TESTS[@]}"; do
   PERFOUT="$OUTDIR/$LABEL.perf.data"
   echo "[TEST] $LABEL ($FLAGS) -> $OUTFILE"
   if [[ $USE_PERF -eq 1 ]]; then
-    perf record -o "$PERFOUT" -- $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
+    perf record --quiet --output="$PERFOUT" -- $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
   else
     $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
   fi
@@ -138,7 +138,7 @@ if [[ $USE_PERF -eq 1 ]]; then
     txt="${f%.perf.data}.perf.txt"
     label=$(basename "${f%.perf.data}")
     echo "[INFO] Running perf report for $label..."
-    perf report -i "$f" --stdio > "$txt"
+    perf report --input="$f" --stdio > "$txt"
     echo "[INFO] perf report saved to $txt"
     echo "==== $(basename "$txt") ====" >> "$PERF_SUMMARY_FILE"
     cat "$txt" >> "$PERF_SUMMARY_FILE"
