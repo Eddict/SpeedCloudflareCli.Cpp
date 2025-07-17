@@ -1,5 +1,5 @@
 #include "network.h"
-#include <curl/curl.h>
+#include <httplib.h>
 #include <stddef.h>
 #include <map>
 #include <sstream>
@@ -10,33 +10,14 @@
 // Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one
 // declaration per statement, no implicit conversions
 
-auto my_curl_write_callback(void* contents, size_t size, size_t nmemb, void* userp) -> size_t
-{
-  const size_t total_size = size * nmemb;
-  auto* string_ptr = static_cast<std::string*>(userp);
-  string_ptr->append(static_cast<char*>(contents), total_size);
-  return total_size;
-}
-
 auto http_get(const std::string& hostname, const std::string& path) -> std::string
 {
-  CURL* curl = curl_easy_init();
-  std::string response;
-  if (curl != nullptr)
-  {
-    const std::string url = "https://" + hostname + path;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    const CURLcode result = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    if (result != CURLE_OK)
-    {
-      return "";
+    httplib::SSLClient cli(hostname.c_str());
+    auto res = cli.Get(path.c_str());
+    if (res && res->status == 200) {
+        return res->body;
     }
-  }
-  return response;
+    return "";
 }
 
 auto http_get(const HttpRequest& req) -> std::string {
@@ -45,38 +26,17 @@ auto http_get(const HttpRequest& req) -> std::string {
 
 auto http_post(const HttpRequest& req, const std::string& data) -> std::string
 {
-  CURL* curl = curl_easy_init();
-  std::string response;
-  std::string debug_info;
-  long http_code = 0;
-  char curl_errbuf[CURL_ERROR_SIZE] = {0};
-  struct curl_slist* headers = nullptr;
-  if (curl != nullptr)
-  {
-    const std::string url = "https://" + req.hostname + req.path;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, data.size());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf);
-    debug_info += "[UPLOAD] URL: " + url + "\n";
-    debug_info += "[UPLOAD] Payload size: " + std::to_string(data.size()) + "\n";
-    const CURLcode result = curl_easy_perform(curl);
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-    curl_easy_cleanup(curl);
-    debug_info += "[UPLOAD] CURLcode: " + std::to_string(result) + "\n";
-    debug_info += "[UPLOAD] HTTP response code: " + std::to_string(http_code) + "\n";
-    if (result != CURLE_OK)
-    {
-      debug_info += "[UPLOAD] curl_easy_perform failed: " + std::string(curl_easy_strerror(result)) + "\n";
-      debug_info += "[UPLOAD] CURL error buffer: " + std::string(curl_errbuf) + "\n";
+    httplib::SSLClient cli(req.hostname.c_str());
+    std::string debug_info;
+    auto res = cli.Post(req.path.c_str(), data, "application/json");
+    if (res) {
+        debug_info += "[UPLOAD] HTTP response code: " + std::to_string(res->status) + "\n";
+        debug_info += "[UPLOAD] Response body size: " + std::to_string(res->body.size()) + "\n";
+        debug_info += res->body;
+    } else {
+        debug_info += "[UPLOAD] HTTP request failed\n";
     }
     return debug_info;
-  }
-  return "[UPLOAD] curl_easy_init failed\n";
 }
 
 auto parse_locations_json(const std::string& json)

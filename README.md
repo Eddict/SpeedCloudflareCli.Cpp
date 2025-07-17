@@ -80,7 +80,6 @@ CC=arm-linux-gnueabihf-gcc cmake . && make -j
 
 ## Requirements
 - Linux
-- libcurl
 - yyjson
 
 ## License
