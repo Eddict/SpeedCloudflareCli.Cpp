@@ -9,8 +9,8 @@ struct HttpRequest {
     std::string hostname;
     std::string path;
 };
-auto http_get(const HttpRequest& req, size_t expected_size = 0) -> std::string;
-auto http_post(const HttpRequest& req, const std::string& data, size_t expected_size = 0) -> std::string;
+auto http_get(const HttpRequest& req) -> std::string;
+auto http_post(const HttpRequest& req, const std::string& data) -> std::string;
 
 // JSON parsing helpers
 auto parse_locations_json(const std::string& json)
