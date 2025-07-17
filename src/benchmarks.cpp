@@ -4,6 +4,7 @@
   // code only for non-cross-compiling builds
   #include <bits/chrono.h>  // for operator-, duration, high_resolution_clock
 #endif
+#include <cstring>        // for strerror
 #include <stddef.h>       // for size_t
 #include <algorithm>      // for max_element, min, min_element
 #include <future>         // for future, async, launch, launch::async
@@ -13,6 +14,8 @@
 #include <string>         // for string, allocator, operator+, char_traits
 #include <thread>         // for thread
 #include <vector>         // for vector, vector<>::iterator
+#include <fstream>        // IWYU pragma: keep  // for logging errors
+#include <pthread.h> // for thread affinity
 #include "network.h"      // for http_get, HttpRequest, http_post, parse_cdn...
 #include "output.h"       // for log_speed_test_result, log_info, log_downlo...
 #include "stats.h"        // for average, jitter, median
@@ -43,11 +46,20 @@ constexpr int kNumLatencyStats = 5;
 
 // Refactored measure_download, measure_upload, and measure_download_parallel to use BenchmarkParams
 
+void set_benchmark_cpu_affinity(int cpu_core) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(cpu_core, &cpuset);
+    pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+}
+
 auto measure_download(const BenchmarkParams& params) -> std::vector<double>
 {
+  set_benchmark_cpu_affinity(0); // Pin to core 0
   std::vector<double> download_results;
   download_results.reserve(params.num_iterations);
   const std::string url = "/__down?bytes=" + std::to_string(params.num_bytes);
+  int failed_requests = 0;
   for (int i = 0; i < params.num_iterations; ++i)
   {
     const auto start_time = std::chrono::high_resolution_clock::now();
@@ -59,23 +71,59 @@ auto measure_download(const BenchmarkParams& params) -> std::vector<double>
           std::chrono::duration<double, std::milli>(end_time - start_time).count();
       download_results.push_back(measure_speed(params.num_bytes, milliseconds));
     }
+    else {
+      ++failed_requests;
+      std::ofstream errlog("results/download_errors.log", std::ios::app);
+      errlog << "Download failed for iteration " << i << "\n";
+    }
+  }
+  // Filter: remove first and slowest run
+  if (download_results.size() > 2) {
+    download_results.erase(download_results.begin()); // remove first
+    auto slowest = std::max_element(download_results.begin(), download_results.end());
+    download_results.erase(slowest);
   }
   return download_results;
 }
 
 auto measure_upload(const BenchmarkParams& params) -> std::vector<double>
 {
+  set_benchmark_cpu_affinity(0); // Pin to core 0
   std::vector<double> upload_results;
   upload_results.reserve(params.num_iterations);
-  const std::string upload_data(params.num_bytes, '0');
+  static std::string upload_data(params.num_bytes, '0'); // Reuse buffer
+  int failed_requests = 0;
   for (int iteration_index = 0; iteration_index < params.num_iterations; ++iteration_index)
   {
-    const auto start_time = std::chrono::high_resolution_clock::now();
-    const std::string response = http_post(HttpRequest{"speed.cloudflare.com", "/__up"}, upload_data);
-    const auto end_time = std::chrono::high_resolution_clock::now();
-    const double milliseconds =
-        std::chrono::duration<double, std::milli>(end_time - start_time).count();
-    upload_results.push_back(measure_speed(params.num_bytes, milliseconds));
+    try {
+      const auto start_time = std::chrono::high_resolution_clock::now();
+      const std::string response = http_post(HttpRequest{"speed.cloudflare.com", "/__up"}, upload_data);
+      const auto end_time = std::chrono::high_resolution_clock::now();
+      const double milliseconds =
+          std::chrono::duration<double, std::milli>(end_time - start_time).count();
+      if (!response.empty())
+      {
+        upload_results.push_back(measure_speed(params.num_bytes, milliseconds));
+      }
+      else {
+        ++failed_requests;
+        std::ofstream errlog("results/upload_errors.log", std::ios::app);
+        errlog << "[" << std::time(nullptr) << "] Upload failed for iteration " << iteration_index;
+        errlog << ", response='" << response << "'";
+        errlog << ", errno=" << errno << " (" << strerror(errno) << ")";
+        errlog << "\n";
+        std::cerr << "[DEBUG] Upload failed for iteration " << iteration_index << ", errno=" << errno << " (" << strerror(errno) << ")\n";
+      }
+    } catch (const std::exception& ex) {
+      std::ofstream errlog("results/upload_errors.log", std::ios::app);
+      errlog << "Upload failed for iteration " << iteration_index << ": exception: " << ex.what() << "\n";
+    }
+  }
+  // Filter: remove first and slowest run
+  if (upload_results.size() > 2) {
+    upload_results.erase(upload_results.begin()); // remove first
+    auto slowest = std::max_element(upload_results.begin(), upload_results.end());
+    upload_results.erase(slowest);
   }
   return upload_results;
 }

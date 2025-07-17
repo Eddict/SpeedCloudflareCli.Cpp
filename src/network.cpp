@@ -47,6 +47,10 @@ auto http_post(const HttpRequest& req, const std::string& data) -> std::string
 {
   CURL* curl = curl_easy_init();
   std::string response;
+  std::string debug_info;
+  long http_code = 0;
+  char curl_errbuf[CURL_ERROR_SIZE] = {0};
+  struct curl_slist* headers = nullptr;
   if (curl != nullptr)
   {
     const std::string url = "https://" + req.hostname + req.path;
@@ -57,14 +61,22 @@ auto http_post(const HttpRequest& req, const std::string& data) -> std::string
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, my_curl_write_callback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, curl_errbuf);
+    debug_info += "[UPLOAD] URL: " + url + "\n";
+    debug_info += "[UPLOAD] Payload size: " + std::to_string(data.size()) + "\n";
     const CURLcode result = curl_easy_perform(curl);
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
     curl_easy_cleanup(curl);
+    debug_info += "[UPLOAD] CURLcode: " + std::to_string(result) + "\n";
+    debug_info += "[UPLOAD] HTTP response code: " + std::to_string(http_code) + "\n";
     if (result != CURLE_OK)
     {
-      return "";
+      debug_info += "[UPLOAD] curl_easy_perform failed: " + std::string(curl_easy_strerror(result)) + "\n";
+      debug_info += "[UPLOAD] CURL error buffer: " + std::string(curl_errbuf) + "\n";
     }
+    return debug_info;
   }
-  return response;
+  return "[UPLOAD] curl_easy_init failed\n";
 }
 
 auto parse_locations_json(const std::string& json)

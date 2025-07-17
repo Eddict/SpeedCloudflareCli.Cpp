@@ -16,3 +16,5 @@ auto http_post(const HttpRequest& req, const std::string& data) -> std::string;
 auto parse_locations_json(const std::string& json)
     -> std::vector<std::map<std::string, std::string>>;
 auto parse_cdn_trace(const std::string& text) -> std::map<std::string, std::string>;
+
+void set_benchmark_cpu_affinity(int cpu_core);

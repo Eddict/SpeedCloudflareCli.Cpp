@@ -70,22 +70,25 @@ $BIN $SYSINFO_FLAGS | tee "$OUTDIR/$SYSINFO_LABEL.txt"
 # Test matrix: (flagset, description)
 declare -a TESTS=(
   "'' 'default'"
-  "'--minimize-output' 'minout'"
+  # "'--minimize-output' 'minout'"  # Less useful
   "'--single-core' '1core'"
   "'--no-yield' 'noyield'"
   "'--no-nice' 'nonice'"
   "'--drop-caches' 'dropcache'"
-  "'--parallel' 'parallel'"
-  "'--parallel --minimize-output' 'par+minout'"
-  "'--parallel --single-core' 'par+1core'"
-  "'--parallel --no-yield' 'par+noyield'"
-  "'--parallel --no-nice' 'par+nonice'"
-  "'--parallel --drop-caches' 'par+dropcache'"
+  # Parallel/multicore scenarios are slower and less useful for ARMv7l
+  # "'--parallel' 'parallel'"
+  # "'--parallel --minimize-output' 'par+minout'"
+  # "'--parallel --single-core' 'par+1core'"
+  # "'--parallel --no-yield' 'par+noyield'"
+  # "'--parallel --no-nice' 'par+nonice'"
+  # "'--parallel --drop-caches' 'par+dropcache'"
 )
 
 PERF_SUMMARY_FILE="$OUTDIR/perf_summary.txt"
 # Check if perf is available if --perf is requested
 if [[ $USE_PERF -eq 1 ]]; then
+  # Remove old perf files before running tests
+  rm -f "$OUTDIR"/*.perf.data
   # Remove summary file
   rm -f "$PERF_SUMMARY_FILE"
   if ! command -v perf >/dev/null 2>&1; then
@@ -103,9 +106,9 @@ for test in "${TESTS[@]}"; do
   PERFOUT="$OUTDIR/$LABEL.perf.data"
   echo "[TEST] $LABEL ($FLAGS) -> $OUTFILE"
   if [[ $USE_PERF -eq 1 ]]; then
-    perf record --quiet --output="$PERFOUT" -- $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
+    taskset -c 0 perf record --quiet --output="$PERFOUT" -- $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
   else
-    $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
+    taskset -c 0 $BIN $FLAGS --json --mask-sensitive > "$OUTFILE"
   fi
   if [[ $USE_GPROF -eq 1 && -f gmon.out ]]; then
     mv gmon.out "$OUTDIR/$LABEL.gmon.out"
