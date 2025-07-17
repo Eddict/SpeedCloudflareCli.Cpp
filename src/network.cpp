@@ -42,11 +42,11 @@ auto http_get(const std::string& hostname, const std::string& path, size_t expec
   return std::string(response_vec.begin(), response_vec.end());
 }
 
-auto http_get(const HttpRequest& req, size_t expected_size = 0) -> std::string {
+auto http_get(const HttpRequest& req, size_t expected_size) -> std::string {
     return http_get(req.hostname, req.path, expected_size);
 }
 
-auto http_post(const HttpRequest& req, const std::string& data, size_t expected_size = 0) -> std::string
+auto http_post(const HttpRequest& req, const std::string& data, size_t expected_size) -> std::string
 {
   CURL* curl = curl_easy_init();
   std::vector<char> response_vec;

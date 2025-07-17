@@ -25,6 +25,9 @@ endif()
 if(CMAKE_CROSSCOMPILING)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
 
+    # add/set this macro to enable conditional code (#ifdef) 
+    add_compile_definitions(CROSSCOMPILING_BUILD)
+
     # Check if the cross-compiler supports GNU extensions (gnu++17 or gnu++1z)
     include(CheckCXXCompilerFlag)
     check_cxx_compiler_flag("-std=gnu++17" COMPILER_SUPPORTS_GNUXX17)
@@ -96,6 +99,17 @@ if(NOT CMAKE_CROSSCOMPILING)
     find_program(CLANG_TIDY_EXE NAMES clang-tidy)
     if(CLANG_TIDY_EXE)
         set_target_properties(SpeedCloudflareCli PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+        file(GLOB SRC_FILES "${USER_SRC_DIR}/*.cpp")
+        add_custom_target(
+            clang-tidy-native
+            COMMAND ${CLANG_TIDY_EXE}
+                -p ${CMAKE_BINARY_DIR}
+                --extra-arg-before=-std=c++17
+                ${SRC_FILES}
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+            COMMENT "Running clang-tidy on user sources"
+            VERBATIM
+        )
     endif()
 endif()
 
@@ -124,20 +138,21 @@ embed_json_raw(
 include_directories("${CMAKE_BINARY_DIR}")
 
 # IWYU integration: add custom target using mapping file (fixed: use SRC_FILES for sources)
-file(GLOB SRC_FILES "${USER_SRC_DIR}/*.cpp")
-find_program(IWYU_EXE NAMES include-what-you-use)
-if(IWYU_EXE)
-    add_custom_target(
-        iwyu
-        COMMAND python3 /usr/local/bin/iwyu_tool.py
-            -p ${CMAKE_BINARY_DIR}
-            ${SRC_FILES}
-            -- -I/usr/lib/gcc/x86_64-linux-gnu/12/include
-            # -- --mapping_file=${CMAKE_SOURCE_DIR}/iwyu_mappings.imp
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Running include-what-you-use with mapping file for all user sources"
-        VERBATIM
-    )
+if(NOT CMAKE_CROSSCOMPILING)
+    file(GLOB SRC_FILES "${USER_SRC_DIR}/*.cpp")
+    find_program(IWYU_EXE NAMES include-what-you-use)
+    if(IWYU_EXE)
+        add_custom_target(
+            iwyu
+            COMMAND python3 /usr/local/bin/iwyu_tool.py
+                -p ${CMAKE_BINARY_DIR}
+                ${SRC_FILES}
+                -- -I/usr/lib/gcc/x86_64-linux-gnu/12/include
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            COMMENT "Running include-what-you-use with mapping file for all user sources"
+            VERBATIM
+        )
+    endif()
 endif()
 
 # End of CMakeLists.txt

@@ -1,5 +1,9 @@
 #include "sysinfo.h"
-#include <bits/chrono.h>           // for milliseconds
+#include <chrono>                  // IWYU pragma: keep  // for milliseconds
+#ifndef CROSSCOMPILING_BUILD
+  // code only for non-cross-compiling builds
+  #include <bits/chrono.h>         // for operator-, duration, high_resolution_clock
+#endif
 #include <sched.h>                 // for sched_setaffinity, cpu_set_t, CPU_SET
 #include <stdio.h>                 // for fopen, fputs, FILE, fclose
 #include <sys/resource.h>          // for setpriority, PRIO_PROCESS

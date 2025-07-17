@@ -1,5 +1,9 @@
 #include "benchmarks.h"
-#include <bits/chrono.h>  // for operator-, duration, high_resolution_clock
+#include <chrono>         // IWYU pragma: keep  // for operator-, duration, high_resolution_clock
+#ifndef CROSSCOMPILING_BUILD
+  // code only for non-cross-compiling builds
+  #include <bits/chrono.h>  // for operator-, duration, high_resolution_clock
+#endif
 #include <stddef.h>       // for size_t
 #include <algorithm>      // for max_element, min, min_element
 #include <future>         // for future, async, launch, launch::async
