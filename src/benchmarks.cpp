@@ -5,7 +5,6 @@
   #include <bits/chrono.h>  // for operator-, duration, high_resolution_clock
 #endif
 #include <cstring>        // for strerror
-#include <stddef.h>       // for size_t
 #include <algorithm>      // for max_element, min, min_element
 #include <future>         // for future, async, launch, launch::async
 #include <iostream>       // for operator<<, basic_ostream, basic_ostream<>:...

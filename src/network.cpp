@@ -1,41 +1,96 @@
 #include "network.h"
-#include <httplib.h>
 #include <stddef.h>
 #include <map>
 #include <sstream>
 #include <string>
 #include <vector>
 #include <yyjson.h>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/beast/version.hpp>
+#include <boost/beast/ssl.hpp>
+#include <boost/asio/connect.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ssl/error.hpp>
+#include <boost/asio/ssl/stream.hpp>
 
 // Modernized: braces, descriptive variable names, trailing return types, auto, nullptr, one
 // declaration per statement, no implicit conversions
 
-auto http_get(const std::string& hostname, const std::string& path) -> std::string
+// Refactored HTTP GET using Boost.Beast
+// Only accept HttpRequest struct to avoid swappable parameters
+auto http_get(const HttpRequest& req) -> std::string
 {
-    httplib::SSLClient cli(hostname.c_str());
-    auto res = cli.Get(path.c_str());
-    if (res && res->status == 200) {
-        return res->body;
+    namespace beast = boost::beast;
+    namespace http = beast::http;
+    namespace net = boost::asio;
+    using tcp = net::ip::tcp;
+
+    net::io_context ioc;
+    net::ssl::context ctx(net::ssl::context::sslv23_client);
+    tcp::resolver resolver(ioc);
+    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+
+    auto const results = resolver.resolve(req.hostname, "443");
+    beast::get_lowest_layer(stream).connect(results);
+    stream.handshake(net::ssl::stream_base::client);
+
+    http::request<http::string_body> request{http::verb::get, req.path, 11};
+    request.set(http::field::host, req.hostname);
+    request.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+    http::write(stream, request);
+
+    beast::flat_buffer buffer;
+    http::response<http::string_body> response;
+    http::read(stream, buffer, response);
+
+    beast::error_code ec;
+    stream.shutdown(ec);
+
+    if (response.result() == http::status::ok) {
+        return response.body();
     }
     return "";
 }
 
-auto http_get(const HttpRequest& req) -> std::string {
-    return http_get(req.hostname, req.path);
-}
-
+// Refactored HTTP POST using Boost.Beast
 auto http_post(const HttpRequest& req, const std::string& data) -> std::string
 {
-    httplib::SSLClient cli(req.hostname.c_str());
+    namespace beast = boost::beast;
+    namespace http = beast::http;
+    namespace net = boost::asio;
+    using tcp = net::ip::tcp;
+
+    net::io_context ioc;
+    net::ssl::context ctx(net::ssl::context::sslv23_client);
+    tcp::resolver resolver(ioc);
+    beast::ssl_stream<beast::tcp_stream> stream(ioc, ctx);
+
+    auto const results = resolver.resolve(req.hostname, "443");
+    beast::get_lowest_layer(stream).connect(results);
+    stream.handshake(net::ssl::stream_base::client);
+
+    http::request<http::string_body> request{http::verb::post, req.path, 11};
+    request.set(http::field::host, req.hostname);
+    request.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    request.set(http::field::content_type, "application/json");
+    request.body() = data;
+    request.prepare_payload();
+
+    http::write(stream, request);
+
+    beast::flat_buffer buffer;
+    http::response<http::string_body> response;
+    http::read(stream, buffer, response);
+
+    beast::error_code ec;
+    stream.shutdown(ec);
+
     std::string debug_info;
-    auto res = cli.Post(req.path.c_str(), data, "application/json");
-    if (res) {
-        debug_info += "[UPLOAD] HTTP response code: " + std::to_string(res->status) + "\n";
-        debug_info += "[UPLOAD] Response body size: " + std::to_string(res->body.size()) + "\n";
-        debug_info += res->body;
-    } else {
-        debug_info += "[UPLOAD] HTTP request failed\n";
-    }
+    debug_info += "[UPLOAD] HTTP response code: " + std::to_string(response.result_int()) + "\n";
+    debug_info += "[UPLOAD] Response body size: " + std::to_string(response.body().size()) + "\n";
+    debug_info += response.body();
     return debug_info;
 }
 

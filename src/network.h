@@ -2,7 +2,6 @@
 #include <map>
 #include <string>
 #include <vector>
-#include <stddef.h>       // for size_t
 
 // HTTP request helpers
 struct HttpRequest {
